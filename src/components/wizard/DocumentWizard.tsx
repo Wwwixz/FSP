@@ -3,13 +3,20 @@ import Stepper from "./Stepper";
 import Step1TextInput from "./Step1TextInput";
 import Step2TypeTemplate from "./Step2TypeTemplate";
 import Step3Review from "./Step3Review";
+import RequisitesForm from "./RequisitesForm";
+import PreviewDocument from "./PreviewDocument";
+import DoneScreen from "./DoneScreen";
 import type {
   DocumentTypeId,
   InputMode,
   RequisiteCheck,
+  RequisiteValues,
+  ResultPhase,
   StepId,
   TemplateId,
 } from "../../types/wizard";
+
+const SENDER_NAME = "Сидоров М.В.";
 
 const DEFAULT_REQUISITES: RequisiteCheck[] = [
   { label: "ФИО отправителя", status: "done" },
@@ -31,7 +38,10 @@ function improveText(text: string): string {
 }
 
 export default function DocumentWizard() {
+  const [view, setView] = useState<"wizard" | "done">("wizard");
   const [step, setStep] = useState<StepId>(1);
+  const [resultPhase, setResultPhase] = useState<ResultPhase>("review");
+
   const [inputMode, setInputMode] = useState<InputMode>("manual");
   const [rawText, setRawText] = useState(
     "Добрый день.\n\nПрошу рассмотреть вопрос о выделении дополнительного финансирования на проведение мероприятия.\n\nЗаранее спасибо.",
@@ -39,12 +49,55 @@ export default function DocumentWizard() {
   const [documentType, setDocumentType] = useState<DocumentTypeId>("memo");
   const [template, setTemplate] = useState<TemplateId>("standard");
   const [improvedText, setImprovedText] = useState("");
+  const [requisiteValues, setRequisiteValues] = useState<RequisiteValues>({
+    outgoingNumber: "",
+    date: "22.08.2025",
+    signatureName: "",
+  });
 
   const goToStep2 = () => setStep(2);
-  const goToStep3 = () => {
+  const goToStep3Review = () => {
     setImprovedText(improveText(rawText));
+    setResultPhase("review");
     setStep(3);
   };
+
+  const missingRequisites = DEFAULT_REQUISITES.filter((r) => r.status === "missing");
+
+  const handleReviewNext = () => {
+    setResultPhase(missingRequisites.length > 0 ? "requisites" : "preview");
+  };
+
+  const handleCreateNew = () => {
+    setView("wizard");
+    setStep(1);
+    setResultPhase("review");
+    setRawText("");
+    setDocumentType("memo");
+    setTemplate("standard");
+    setImprovedText("");
+    setRequisiteValues({ outgoingNumber: "", date: "22.08.2025", signatureName: "" });
+  };
+
+  // Степпер экрана «Заполните недостающие реквизиты» в макете указывает
+  // на шаг 2 — заполнение реквизитов трактуется как продолжение выбора
+  // шаблона, поскольку именно шаблон определяет обязательные поля.
+  const stepperValue: StepId = step === 3 && resultPhase === "requisites" ? 2 : step;
+
+  if (view === "done") {
+    return <DoneScreen onCreateNew={handleCreateNew} />;
+  }
+
+  if (step === 3 && resultPhase === "preview") {
+    return (
+      <PreviewDocument
+        improvedText={improvedText}
+        requisites={requisiteValues}
+        senderName={SENDER_NAME}
+        onDownload={() => setView("done")}
+      />
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
@@ -55,7 +108,7 @@ export default function DocumentWizard() {
       </p>
 
       <div className="mt-5">
-        <Stepper currentStep={step} />
+        <Stepper currentStep={stepperValue} />
       </div>
 
       <div className="mt-6">
@@ -76,19 +129,26 @@ export default function DocumentWizard() {
             onDocumentTypeChange={setDocumentType}
             onTemplateChange={setTemplate}
             onBack={() => setStep(1)}
-            onNext={goToStep3}
+            onNext={goToStep3Review}
           />
         )}
 
-        {step === 3 && (
+        {step === 3 && resultPhase === "review" && (
           <Step3Review
             improvedText={improvedText}
             onImprovedTextChange={setImprovedText}
             requisites={DEFAULT_REQUISITES}
             onBack={() => setStep(2)}
-            onNext={() => {
-              // Следующий экран (заполнение реквизитов) — вне рамок первых 3 экранов.
-            }}
+            onNext={handleReviewNext}
+          />
+        )}
+
+        {step === 3 && resultPhase === "requisites" && (
+          <RequisitesForm
+            values={requisiteValues}
+            onChange={setRequisiteValues}
+            onBack={() => setResultPhase("review")}
+            onNext={() => setResultPhase("preview")}
           />
         )}
       </div>

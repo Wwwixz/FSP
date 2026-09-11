@@ -68,3 +68,13 @@ export interface WizardState {
   template: TemplateId;
   improvedText: string;
 }
+
+/** Подэтапы шага 3 «Результат». */
+export type ResultPhase = "review" | "requisites" | "preview";
+
+export interface RequisiteValues {
+  outgoingNumber: string;
+  date: string;
+  signatureName: string;
+}
+
