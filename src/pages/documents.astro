@@ -1,0 +1,64 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+
+interface DocEntry {
+  name: string;
+  type: string;
+  date: string;
+}
+
+const documents: DocEntry[] = [
+  { name: "Служебная_записка.docx", type: "Служебная записка", date: "22.06.2025" },
+  { name: "Докладная_отдел_продаж.docx", type: "Докладная записка", date: "14.05.2025" },
+  { name: "Справка_о_доходах.docx", type: "Информационная справка", date: "02.04.2025" },
+];
+---
+
+<AppLayout title="DocHelper — Мои документы">
+  <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-ink-900">Мои документы</h1>
+        <p class="mt-1 text-sm text-ink-600">Все документы, созданные в DocHelper.</p>
+      </div>
+      <a
+        href="/"
+        class="rounded-lg bg-accent-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
+      >
+        + Создать документ
+      </a>
+    </div>
+
+    <ul class="mt-6 divide-y divide-line">
+      {documents.map((doc) => (
+        <li class="flex items-center justify-between gap-4 py-3.5">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M4 2H9.5L12.5 5V13.5C12.5 14.05 12.05 14.5 11.5 14.5H4.5C3.95 14.5 3.5 14.05 3.5 13.5V2.5C3.5 1.95 3.95 2 4 2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                <path d="M9.3 2V5H12.3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-ink-900">{doc.name}</p>
+              <p class="text-xs text-ink-400">{doc.type} · {doc.date}</p>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              aria-label="Скачать"
+              class="flex h-8 w-8 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-surface hover:text-ink-900"
+            >
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M7 1.5V9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                <path d="M4 6.5L7 9.5L10 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2.5 11.5H11.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+</AppLayout>

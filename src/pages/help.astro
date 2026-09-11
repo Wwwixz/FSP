@@ -1,0 +1,52 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+
+const faq = [
+  {
+    q: "Какие форматы документов поддерживаются?",
+    a: "На данный момент DocHelper формирует документы в формате .docx. Поддержка PDF появится в одном из следующих обновлений.",
+  },
+  {
+    q: "Как исправить реквизиты после создания документа?",
+    a: "Вернитесь на шаг «Заполнение реквизитов» с помощью кнопки «Назад» — все поля останутся редактируемыми до момента скачивания.",
+  },
+  {
+    q: "Можно ли использовать свой шаблон?",
+    a: "Сейчас доступны два встроенных шаблона — «Стандартный» и «Современный». Загрузка собственных шаблонов в разработке.",
+  },
+  {
+    q: "Куда сохраняются созданные документы?",
+    a: "Список всех документов, которые вы скачали, доступен в разделе «Мои документы».",
+  },
+];
+---
+
+<AppLayout title="DocHelper — Помощь">
+  <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+    <h1 class="text-xl font-semibold text-ink-900">Помощь</h1>
+    <p class="mt-1 text-sm text-ink-600">Частые вопросы о работе с DocHelper.</p>
+
+    <div class="mt-6 divide-y divide-line">
+      {faq.map((item) => (
+        <details class="group py-4">
+          <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-ink-900">
+            {item.q}
+            <span class="ml-4 shrink-0 text-ink-400 transition-transform group-open:rotate-45">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              </svg>
+            </span>
+          </summary>
+          <p class="mt-2 text-sm leading-relaxed text-ink-600">{item.a}</p>
+        </details>
+      ))}
+    </div>
+
+    <div class="mt-6 rounded-xl bg-accent-50 p-4 text-sm text-ink-900">
+      Не нашли ответ? Напишите нам на
+      <a href="mailto:support@dochelper.app" class="font-medium text-accent-600 hover:underline">
+        support@dochelper.app
+      </a>
+    </div>
+  </div>
+</AppLayout>
