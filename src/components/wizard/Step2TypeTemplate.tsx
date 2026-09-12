@@ -17,19 +17,41 @@ interface Step2Props {
 function DocumentTypeIcon({ id }: { id: DocumentTypeId }) {
   if (id === "letter") {
     return (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="2.5" y="4.5" width="17" height="13" rx="1.6" stroke="currentColor" strokeWidth="1.4" />
-        <path d="M3.5 5.5L11 12L18.5 5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect x="2.5" y="4.5" width="19" height="15" rx="2" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M3.5 5.5L12 12.5L20.5 5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
+  if (id === "memo") {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M7 3H15L18 6V19C18 19.55 17.55 20 17 20H7C6.45 20 6 19.55 6 19V4C6 3.45 6.45 3 7 3Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M14 3V6H17" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M8.5 11H15.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M8.5 14H15.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M8.5 17H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (id === "report") {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M7 3H15L18 6V19C18 19.55 17.55 20 17 20H7C6.45 20 6 19.55 6 19V4C6 3.45 6.45 3 7 3Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M14 3V6H17" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M9 11L11 13L15 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  // certificate
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M6 2.5H14.5L17.5 5.5V18C17.5 18.55 17.05 19 16.5 19H6C5.45 19 5 18.55 5 18V3.5C5 2.95 5.45 2.5 6 2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M14 2.5V5.5H17" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M7.5 10H14.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M7.5 12.5H14.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M7.5 15H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 8H16" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M8 11H16" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M8 14H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <circle cx="16" cy="17" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M14.8 17L15.7 18L17.3 16.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -38,17 +60,17 @@ function TemplatePreview({ variant }: { variant: TemplateId }) {
   return (
     <div className="flex gap-2">
       {[0, 1].map((i) => (
-        <div key={i} className="flex-1 rounded-md border border-line bg-surface p-2">
+        <div key={i} className="flex-1 rounded-lg border border-line bg-surface p-2.5">
           <div
             className={
               variant === "standard"
-                ? "h-1.5 w-3/4 rounded-full bg-ink-400/50"
-                : "h-2 w-2/3 rounded-full bg-accent-500/60"
+                ? "h-1.5 w-3/4 rounded-full bg-ink-400/40"
+                : "h-2 w-2/3 rounded-full bg-accent-500/50"
             }
           />
           <div className="mt-2 space-y-1">
             {[...Array(4)].map((_, line) => (
-              <div key={line} className="h-1 rounded-full bg-ink-400/30" style={{ width: `${90 - line * 12}%` }} />
+              <div key={line} className="h-1 rounded-full bg-ink-400/25" style={{ width: `${90 - line * 12}%` }} />
             ))}
           </div>
         </div>
@@ -66,9 +88,9 @@ export default function Step2TypeTemplate({
   onNext,
 }: Step2Props) {
   return (
-    <section>
+    <section className="animate-fade-in">
       <div>
-        <h3 className="text-sm font-medium text-ink-900">1. Выберите тип документа</h3>
+        <h3 className="text-sm font-semibold text-ink-900">1. Выберите тип документа</h3>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {DOCUMENT_TYPES.map((option) => {
             const selected = option.id === documentType;
@@ -78,22 +100,27 @@ export default function Step2TypeTemplate({
                 type="button"
                 onClick={() => onDocumentTypeChange(option.id)}
                 className={[
-                  "flex flex-col items-center gap-2.5 rounded-xl border p-4 text-center text-sm transition-colors",
+                  "card-hover group flex flex-col items-center gap-3 rounded-xl border-2 p-4 text-center text-sm transition-all duration-200",
                   selected
-                    ? "border-accent-500 bg-accent-50 text-accent-600"
+                    ? "border-accent-500 bg-accent-50 text-accent-600 shadow-md shadow-accent-500/10"
                     : "border-line bg-white text-ink-600 hover:border-ink-400/50",
                 ].join(" ")}
               >
-                <DocumentTypeIcon id={option.id} />
-                {option.label}
+                <div className={[
+                  "flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-200",
+                  selected ? "bg-accent-100 text-accent-600" : "bg-surface text-ink-400 group-hover:text-ink-600",
+                ].join(" ")}>
+                  <DocumentTypeIcon id={option.id} />
+                </div>
+                <span class="font-medium">{option.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="mt-7">
-        <h3 className="text-sm font-medium text-ink-900">2. Выберите шаблон</h3>
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-ink-900">2. Выберите шаблон</h3>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {TEMPLATES.map((option) => {
             const selected = option.id === template;
@@ -103,22 +130,26 @@ export default function Step2TypeTemplate({
                 type="button"
                 onClick={() => onTemplateChange(option.id)}
                 className={[
-                  "rounded-xl border p-4 text-left transition-colors",
-                  selected ? "border-accent-500 bg-accent-50" : "border-line bg-white hover:border-ink-400/50",
+                  "card-hover group rounded-xl border-2 p-5 text-left transition-all duration-200",
+                  selected ? "border-accent-500 bg-accent-50 shadow-md shadow-accent-500/10" : "border-line bg-white hover:border-ink-400/50",
                 ].join(" ")}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-medium text-ink-900">{option.title}</p>
+                    <p className="text-sm font-semibold text-ink-900">{option.title}</p>
                     <p className="mt-1 text-xs leading-relaxed text-ink-600">{option.description}</p>
                   </div>
                   <span
                     className={[
-                      "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2",
-                      selected ? "border-accent-600" : "border-ink-400/40",
+                      "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200",
+                      selected ? "border-accent-600 bg-accent-600" : "border-ink-400/30",
                     ].join(" ")}
                   >
-                    {selected && <span className="h-2 w-2 rounded-full bg-accent-600" />}
+                    {selected && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 5.2L4 7.2L8 3.2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                   </span>
                 </div>
                 <div className="mt-3">
@@ -130,20 +161,26 @@ export default function Step2TypeTemplate({
         </div>
       </div>
 
-      <div className="mt-7 flex items-center justify-between">
+      <div className="mt-8 flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
-          className="rounded-lg border border-line px-4 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:bg-surface"
+          className="btn-press flex items-center gap-2 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink-600 transition-all duration-200 hover:bg-surface"
         >
-          ← Назад
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Назад
         </button>
         <button
           type="button"
           onClick={onNext}
-          className="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
+          className="btn-press flex items-center gap-2 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
         >
-          Далее →
+          Далее
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
     </section>

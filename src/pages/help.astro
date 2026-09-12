@@ -5,48 +5,82 @@ const faq = [
   {
     q: "Какие форматы документов поддерживаются?",
     a: "На данный момент DocHelper формирует документы в формате .docx. Поддержка PDF появится в одном из следующих обновлений.",
+    icon: "doc",
   },
   {
     q: "Как исправить реквизиты после создания документа?",
     a: "Вернитесь на шаг «Заполнение реквизитов» с помощью кнопки «Назад» — все поля останутся редактируемыми до момента скачивания.",
+    icon: "edit",
   },
   {
     q: "Можно ли использовать свой шаблон?",
     a: "Сейчас доступны два встроенных шаблона — «Стандартный» и «Современный». Загрузка собственных шаблонов в разработке.",
+    icon: "template",
   },
   {
     q: "Куда сохраняются созданные документы?",
-    a: "Список всех документов, которые вы скачали, доступен в разделе «Мои документы».",
+    a: "Список всех документов, которые вы скачали, доступен в разделе «Мои документы». Данные хранятся локально в браузере.",
+    icon: "folder",
+  },
+  {
+    q: "Как работает ИИ-обработка текста?",
+    a: "Нейросеть исправляет ошибки, приводит текст к деловому стилю и структурирует его. При этом ИИ не добавляет факты, которых не было в черновике.",
+    icon: "ai",
   },
 ];
 ---
 
 <AppLayout title="DocHelper — Помощь">
-  <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
-    <h1 class="text-xl font-semibold text-ink-900">Помощь</h1>
-    <p class="mt-1 text-sm text-ink-600">Частые вопросы о работе с DocHelper.</p>
+  <div class="animate-fade-in rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03] sm:p-8">
+    <div class="flex items-center gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-50 text-accent-600">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M7.5 7.5c0-1.4 1.1-2.5 2.5-2.5s2.5 1 2.5 2c0 1.5-2.5 1.6-2.5 3" stroke="currentColor" strokeWidth="1.5" stroke-linecap="round" />
+          <circle cx="10" cy="14" r="0.6" fill="currentColor" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-semibold text-ink-900">Помощь</h1>
+        <p class="text-sm text-ink-600">Частые вопросы о работе с DocHelper.</p>
+      </div>
+    </div>
 
-    <div class="mt-6 divide-y divide-line">
+    <div class="stagger-children mt-6 divide-y divide-line">
       {faq.map((item) => (
         <details class="group py-4">
-          <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-ink-900">
+          <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-ink-900 transition-colors hover:text-accent-600">
             {item.q}
-            <span class="ml-4 shrink-0 text-ink-400 transition-transform group-open:rotate-45">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <span class="ml-4 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-surface text-ink-400 transition-all duration-200 group-open:rotate-45 group-open:bg-accent-50 group-open:text-accent-600">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1.5V12.5M1.5 7H12.5" stroke="currentColor" strokeWidth="1.6" stroke-linecap="round" />
               </svg>
             </span>
           </summary>
-          <p class="mt-2 text-sm leading-relaxed text-ink-600">{item.a}</p>
+          <p class="mt-3 text-sm leading-relaxed text-ink-600 pl-0">{item.a}</p>
         </details>
       ))}
     </div>
 
-    <div class="mt-6 rounded-xl bg-accent-50 p-4 text-sm text-ink-900">
-      Не нашли ответ? Напишите нам на
-      <a href="mailto:support@dochelper.app" class="font-medium text-accent-600 hover:underline">
-        support@dochelper.app
-      </a>
+    <div class="mt-6 rounded-xl bg-gradient-to-r from-accent-50 to-accent-100/50 p-5">
+      <div class="flex items-start gap-3">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-600 text-white">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2L14 13H2L8 2Z" stroke="currentColor" strokeWidth="1.4" stroke-linejoin="round" />
+            <path d="M8 6.5V9" stroke="currentColor" strokeWidth="1.4" stroke-linecap="round" />
+            <circle cx="8" cy="11" r="0.5" fill="currentColor" />
+          </svg>
+        </div>
+        <div>
+          <p class="text-sm font-medium text-ink-900">Не нашли ответ?</p>
+          <p class="mt-0.5 text-sm text-ink-600">
+            Напишите нам на{" "}
+            <a href="mailto:support@dochelper.app" class="font-medium text-accent-600 hover:underline">
+              support@dochelper.app
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </AppLayout>

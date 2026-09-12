@@ -16,15 +16,91 @@ const { title } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="h-screen overflow-hidden bg-surface">
+  <body class="h-screen overflow-hidden bg-surface font-sans">
+    <!-- Mobile header -->
+    <header class="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-white/80 px-4 backdrop-blur-md md:hidden">
+      <div class="flex items-center gap-2">
+        <svg width="20" height="20" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="3" y="1.5" width="16" height="19" rx="2" stroke="#2563eb" stroke-width="1.6" />
+          <path d="M7 6.5H15" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M7 10.5H15" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M7 14.5H11.5" stroke="#2563eb" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+        <span class="text-sm font-semibold text-ink-900">DocHelper</span>
+      </div>
+      <button
+        id="sidebar-toggle"
+        type="button"
+        class="flex h-9 w-9 items-center justify-center rounded-lg text-ink-600 transition-colors hover:bg-surface"
+        aria-label="Открыть меню"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M3 5H17M3 10H17M3 15H17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- Sidebar overlay (mobile) -->
+    <div
+      id="sidebar-overlay"
+      class="sidebar-overlay fixed inset-0 z-40 bg-navy-950/50 opacity-0 pointer-events-none md:hidden"
+      aria-hidden="true"
+    ></div>
+
+    <!-- Layout -->
     <div class="flex h-full">
-      <Sidebar />
-      <main class="flex-1 overflow-y-auto">
-        <div class="mx-auto max-w-3xl px-6 py-10">
+      <!-- Sidebar -->
+      <div
+        id="sidebar-panel"
+        class="sidebar-panel fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col bg-navy-900 text-white md:relative md:z-auto md:translate-x-0"
+      >
+        <Sidebar />
+      </div>
+
+      <main class="flex-1 overflow-y-auto pt-14 md:pt-0">
+        <div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-10 page-content">
           <slot />
         </div>
       </main>
     </div>
+
+    <script>
+      const toggle = document.getElementById("sidebar-toggle");
+      const overlay = document.getElementById("sidebar-overlay");
+      const panel = document.getElementById("sidebar-panel");
+
+      function openSidebar() {
+        overlay?.classList.remove("opacity-0", "pointer-events-none");
+        overlay?.classList.add("opacity-100", "pointer-events-auto");
+        panel?.classList.remove("-translate-x-full");
+        document.body.classList.add("sidebar-open");
+      }
+
+      function closeSidebar() {
+        overlay?.classList.add("opacity-0", "pointer-events-none");
+        overlay?.classList.remove("opacity-100", "pointer-events-auto");
+        panel?.classList.add("-translate-x-full");
+        document.body.classList.remove("sidebar-open");
+      }
+
+      toggle?.addEventListener("click", openSidebar);
+      overlay?.addEventListener("click", closeSidebar);
+
+      // Close on Escape
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeSidebar();
+      });
+
+      // Close sidebar on nav click (mobile)
+      panel?.querySelectorAll("nav a").forEach((link) => {
+        link.addEventListener("click", () => {
+          if (window.innerWidth < 768) closeSidebar();
+        });
+      });
+    </script>
   </body>
 </html>
