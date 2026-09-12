@@ -42,35 +42,26 @@ export interface TemplateOption {
 export const TEMPLATES: TemplateOption[] = [
   {
     id: "standard",
-    title: "Стандартный",
-    description: "Классический строгий стиль. Подойдёт для большинства служебных записок.",
+    title: "Классический корпоративный",
+    description:
+      "Times New Roman 14 pt, интервал 1,5, абзацный отступ 1,25 см, выравнивание по ширине, верхний колонтитул с названием организации.",
   },
   {
     id: "modern",
-    title: "Современный",
-    description: "Более лаконичный дизайн с современной вёрсткой и шрифтом.",
+    title: "Современный регламентный",
+    description:
+      "Arial 12 pt, интервал 1,15, табличная шапка «Кому / От кого», подпись по центру, нижний колонтитул с названием документа и датой.",
   },
 ];
 
 export type RequisiteStatus = "done" | "missing";
 
 export interface RequisiteCheck {
+  key?: string;
   label: string;
   status: RequisiteStatus;
   hint?: string;
 }
-
-export interface WizardState {
-  step: StepId;
-  inputMode: InputMode;
-  rawText: string;
-  documentType: DocumentTypeId;
-  template: TemplateId;
-  improvedText: string;
-}
-
-/** Подэтапы шага 3 «Результат». */
-export type ResultPhase = "review" | "requisites" | "preview";
 
 export interface RequisiteValues {
   outgoingNumber: string;
@@ -78,3 +69,66 @@ export interface RequisiteValues {
   signatureName: string;
 }
 
+export type ResultPhase = "review" | "requisites" | "preview";
+
+export interface RequisiteDto {
+  recipient?: string | null;
+  author?: string | null;
+  subject?: string | null;
+  date?: string | null;
+  number?: string | null;
+  signature?: string | null;
+  salutation?: string | null;
+  executor?: string | null;
+  organization?: string | null;
+}
+
+export interface RequisiteCheckDto {
+  key: string;
+  label: string;
+  status: string;
+  hint?: string | null;
+}
+
+export interface ProcessRequest {
+  text: string;
+  documentType: DocumentTypeId;
+  templateId: TemplateId;
+}
+
+export interface ProcessResponse {
+  documentId: string;
+  improvedText: string;
+  documentType: DocumentTypeId;
+  templateId: TemplateId;
+  requisites: RequisiteDto;
+  checks: RequisiteCheckDto[];
+  missing: string[];
+}
+
+export interface DemoDraftDto {
+  id: string;
+  documentType: DocumentTypeId;
+  title: string;
+  text: string;
+}
+
+export interface GenerateResponse {
+  success: boolean;
+  documentId: string;
+  fileName: string;
+  downloadUrl: string;
+  warnings: string[];
+}
+
+export interface ApiError {
+  success: boolean;
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ApiError["error"] };

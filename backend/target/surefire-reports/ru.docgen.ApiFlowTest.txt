@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: ru.docgen.ApiFlowTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.705 s -- in ru.docgen.ApiFlowTest

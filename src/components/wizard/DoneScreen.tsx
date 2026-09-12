@@ -1,5 +1,7 @@
 interface DoneScreenProps {
   onCreateNew: () => void;
+  downloadUrl?: string;
+  fileName?: string;
 }
 
 function DocumentCheckIcon() {
@@ -40,7 +42,12 @@ function FolderIllustration() {
   );
 }
 
-export default function DoneScreen({ onCreateNew }: DoneScreenProps) {
+export default function DoneScreen({
+  onCreateNew,
+  downloadUrl,
+  fileName = "document.docx",
+}: DoneScreenProps) {
+  const href = downloadUrl ?? undefined;
   return (
     <div className="rounded-2xl border border-line bg-card px-6 py-14 text-center shadow-sm shadow-ink-900/[0.03]">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-50 text-accent-600">
@@ -53,18 +60,28 @@ export default function DoneScreen({ onCreateNew }: DoneScreenProps) {
       </p>
 
       <div className="mx-auto mt-7 flex max-w-xs flex-col gap-3">
-        <a
-          href="#"
-          download="Служебная_записка.docx"
-          className="flex items-center justify-center gap-2 rounded-lg bg-accent-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
-        >
-          <svg width="15" height="15" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M7 1.5V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            <path d="M4 6.5L7 9.5L10 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M2.5 11.5H11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          Скачать .docx
-        </a>
+        {href ? (
+          <a
+            href={href}
+            download={fileName}
+            className="flex items-center justify-center gap-2 rounded-lg bg-accent-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
+          >
+            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M7 1.5V9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              <path d="M4 6.5L7 9.5L10 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2.5 11.5H11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+            Скачать {fileName}
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-lg bg-ink-200 py-2.5 text-sm font-medium text-ink-500"
+          >
+            Ссылка на скачивание недоступна
+          </button>
+        )}
         <button
           type="button"
           onClick={onCreateNew}

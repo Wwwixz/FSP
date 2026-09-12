@@ -1,5 +1,151 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RequisiteCheck } from "../../types/wizard";
+import SignaturePad, { SIGNATURE_STORAGE_KEY } from "./SignaturePad";
+
+export const PHOTO_STORAGE_KEY = "dochelper:photo-image";
+
+function PhotoUploadPad({ compact = false }: { compact?: boolean }) {
+  const [currentPhoto, setCurrentPhoto] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const v = window.localStorage.getItem(PHOTO_STORAGE_KEY);
+      return v && v.trim() ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const [msg, setMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (msg) {
+      const t = setTimeout(() => setMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [msg]);
+
+  const setLocal = (b64: string | null) => {
+    try {
+      if (b64) window.localStorage.setItem(PHOTO_STORAGE_KEY, b64);
+      else window.localStorage.removeItem(PHOTO_STORAGE_KEY);
+    } catch { /* ignore */ }
+    setCurrentPhoto(b64);
+  };
+
+  const processFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setMsg({ text: "Можно загружать только изображения", err: true });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg({ text: "Размер файла не должен превышать 5 МБ", err: true });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const v = reader.result as string;
+      setLocal(v);
+      setMsg({ text: "✅ Фото сохранено" });
+    };
+    reader.onerror = () => setMsg({ text: "Ошибка чтения файла", err: true });
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) processFile(f);
+  };
+
+  const deletePhoto = () => {
+    setLocal(null);
+    setMsg({ text: "Фото удалено" });
+  };
+
+  return (
+    <div
+      className={[
+        "rounded-2xl border border-line bg-card shadow-sm shadow-ink-900/[0.03]",
+        compact ? "p-4" : "p-5",
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <h3 className="text-sm font-semibold text-ink-900">Фото 📷</h3>
+          <p className="mt-0.5 text-xs text-ink-500">
+            Загрузите своё фото (аватар) для шапки документа
+          </p>
+        </div>
+      </div>
+
+      {/* Current preview */}
+      <div className="mb-4">
+        {currentPhoto ? (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-line bg-surface/60 p-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-700 mb-2">Текущее фото</p>
+              <div className="rounded-md border border-line bg-white p-2 inline-block">
+                <img
+                  src={currentPhoto}
+                  alt="Фото"
+                  className="h-20 w-16 object-cover rounded"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={deletePhoto}
+              className="shrink-0 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-600 hover:bg-surface transition-colors"
+            >
+              🗑 Удалить
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-line bg-surface/40 p-3 text-xs text-ink-500">
+            ⚠️ Фото не задано — в документе будет только текст
+          </div>
+        )}
+      </div>
+
+      <div
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+        className="rounded-lg border border-dashed border-line bg-surface/60 p-4 flex flex-col items-center gap-2"
+      >
+        <label
+          htmlFor="photo-pad-file-input"
+          className="flex cursor-pointer flex-col items-center gap-2 text-center hover:bg-white/60 rounded-lg px-4 py-3 w-full transition-colors"
+        >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="text-accent-500">
+            <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.8" />
+            <circle cx="9" cy="11" r="2" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M21 17L16 12L5 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="text-sm font-medium text-ink-900">Нажмите или перетащите фото</p>
+          <p className="text-xs text-ink-500">PNG, JPG — до 5 МБ</p>
+        </label>
+        <input
+          id="photo-pad-file-input"
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg"
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) processFile(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {msg && (
+        <p className={["mt-3 text-xs min-h-[1rem]", msg.err ? "text-danger-600" : "text-success-600"].join(" ")}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface Step3Props {
   improvedText: string;
@@ -95,6 +241,11 @@ export default function Step3Review({
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <SignaturePad compact />
+        <PhotoUploadPad compact />
       </div>
 
       <div className="mt-6 flex items-center justify-between">

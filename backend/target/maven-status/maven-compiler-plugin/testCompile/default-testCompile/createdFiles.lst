@@ -1,0 +1,6 @@
+ru\docgen\DocxGenerationServiceTest.class
+ru\docgen\AIJsonParserTest.class
+ru\docgen\AiFailureScenarioTest.class
+ru\docgen\MockAIProviderTest.class
+ru\docgen\RequisitesServiceTest.class
+ru\docgen\ApiFlowTest.class

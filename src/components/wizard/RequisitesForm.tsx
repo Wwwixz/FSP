@@ -1,10 +1,41 @@
-import type { RequisiteValues } from "../../types/wizard";
+import { useState } from "react";
+import type { RequisiteCheckDto } from "../../types/wizard";
 
 interface RequisitesFormProps {
-  values: RequisiteValues;
-  onChange: (values: RequisiteValues) => void;
+  checks: RequisiteCheckDto[];
+  values: Record<string, string>;
+  onChange: (values: Record<string, string>) => void;
   onBack: () => void;
   onNext: () => void;
+}
+
+interface FieldError {
+  key: string;
+  message: string;
+}
+
+function isValidDateFormat(value: string): boolean {
+  if (!value || !value.trim()) return true;
+  const trimmed = value.trim();
+  const regex = /^\d{2}\.\d{2}\.\d{4}$/;
+  if (!regex.test(trimmed)) return false;
+  const [day, month, year] = trimmed.split(".").map(Number);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if ([4, 6, 9, 11].includes(month) && day > 30) return false;
+  if (month === 2) {
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    return day <= (isLeap ? 29 : 28);
+  }
+  return true;
+}
+
+function isValidNumberFormat(value: string): boolean {
+  if (!value || !value.trim()) return true;
+  const trimmed = value.trim();
+  if (!/\d/.test(trimmed)) return false;
+  const regex = /^[\dА-Яа-яA-Za-z\-\/\\]+$/;
+  return regex.test(trimmed);
 }
 
 function CalendarIcon() {
@@ -17,69 +48,117 @@ function CalendarIcon() {
   );
 }
 
-export default function RequisitesForm({ values, onChange, onBack, onNext }: RequisitesFormProps) {
-  const numberMissing = values.outgoingNumber.trim().length === 0;
-  const signatureMissing = values.signatureName.trim().length === 0;
-  const canProceed = !numberMissing && !signatureMissing && values.date.trim().length > 0;
+const KEY_PLACEHOLDERS: Record<string, string> = {
+  recipient: "Кому, например: Генеральному директору ООО «Ромашка» Иванову И.И.",
+  author: "От кого, например: начальник отдела Петров П.П.",
+  subject: "Короткий заголовок или тема",
+  date: "ДД.ММ.ГГГГ, например 12.03.2025",
+  number: "Например: 47-СЗ, 12/23",
+  signature: "ФИО, например: Петров П.П.",
+  salutation: "Обращение, например: Уважаемый Фёдор Фёдорович!",
+  executor: "ФИО + контакты исполнителя",
+  organization: "Наименование организации",
+};
+
+export default function RequisitesForm({
+  checks,
+  values,
+  onChange,
+  onBack,
+  onNext,
+}: RequisitesFormProps) {
+  const missingChecks = checks.filter((c) => c.status === "missing");
+  const allMissingFilled = missingChecks.every((c) => (values[c.key] ?? "").trim().length > 0);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (key: string, value: string): string | null => {
+    if (key === "date" && !isValidDateFormat(value)) {
+      return "Введите дату в формате ДД.ММ.ГГГГ (например 12.03.2025)";
+    }
+    if (key === "number" && !isValidNumberFormat(value)) {
+      return "Номер должен содержать цифры. Допустимы: буквы, дефис, слэш (например 47-СЗ, 12/23)";
+    }
+    return null;
+  };
+
+  const setValue = (key: string, v: string) => {
+    const nextValues = { ...values, [key]: v };
+    onChange(nextValues);
+    const err = validateField(key, v);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[key] = err;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const hasFormatErrors = Object.keys(errors).length > 0;
 
   return (
     <section>
       <h2 className="text-lg font-medium text-ink-900">Заполните недостающие реквизиты</h2>
+      <p className="mt-1 text-sm text-ink-600">
+        Если не хотите заполнять сейчас — оставьте поле пустым, в документе
+        появится пометка «[Заполнить]».
+      </p>
 
       <div className="mt-5 space-y-5">
-        <div>
-          <label htmlFor="outgoing-number" className="text-sm text-ink-900">
-            Исходящий номер <span className="text-danger-500">*</span>
-          </label>
-          <input
-            id="outgoing-number"
-            type="text"
-            value={values.outgoingNumber}
-            onChange={(e) => onChange({ ...values, outgoingNumber: e.target.value })}
-            placeholder="Например: 123/23"
-            className={[
-              "mt-2 w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400",
-              numberMissing ? "border-danger-500 bg-danger-50/40" : "border-line focus:border-accent-500",
-            ].join(" ")}
-          />
-          {numberMissing && <p className="mt-1.5 text-xs text-danger-500">Обязательное поле</p>}
-        </div>
+        {missingChecks.length === 0 && (
+          <p className="rounded-lg bg-success-50 p-4 text-sm text-ink-900">
+            Все обязательные реквизиты заполнены ✅
+          </p>
+        )}
 
-        <div>
-          <label htmlFor="doc-date" className="text-sm text-ink-900">
-            Дата <span className="text-danger-500">*</span>
-          </label>
-          <div className="relative mt-2">
-            <input
-              id="doc-date"
-              type="text"
-              value={values.date}
-              onChange={(e) => onChange({ ...values, date: e.target.value })}
-              className="w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-accent-500"
-            />
-            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-400">
-              <CalendarIcon />
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="signature-name" className="text-sm text-ink-900">
-            Подпись
-          </label>
-          <input
-            id="signature-name"
-            type="text"
-            value={values.signatureName}
-            onChange={(e) => onChange({ ...values, signatureName: e.target.value })}
-            placeholder="ФИО"
-            className={[
-              "mt-2 w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400",
-              signatureMissing ? "border-danger-500 bg-danger-50/40" : "border-line focus:border-accent-500",
-            ].join(" ")}
-          />
-          {signatureMissing && <p className="mt-1.5 text-xs text-danger-500">Укажите ФИО</p>}
-        </div>
+        {missingChecks.map((check) => {
+          const value = values[check.key] ?? "";
+          const missing = value.trim().length === 0;
+          const isDate = check.key === "date";
+          const isNumber = check.key === "number";
+          const fieldError = errors[check.key];
+          const showErrorBorder = !missing && fieldError;
+          return (
+            <div key={check.key}>
+              <label htmlFor={`req-${check.key}`} className="text-sm text-ink-900">
+                {check.label} <span className="text-danger-500">*</span>
+              </label>
+              {check.hint && (
+                <p className="mt-0.5 text-xs text-ink-500">{check.hint}</p>
+              )}
+              <div className="relative mt-2">
+                <input
+                  id={`req-${check.key}`}
+                  type="text"
+                  value={value}
+                  onChange={(e) => setValue(check.key, e.target.value)}
+                  placeholder={KEY_PLACEHOLDERS[check.key] ?? ""}
+                  inputMode={isDate || isNumber ? "text" : "text"}
+                  className={[
+                    "w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none",
+                    showErrorBorder
+                      ? "border-danger-500 bg-danger-50/40 focus:border-danger-500"
+                      : missing
+                      ? "border-danger-500 bg-danger-50/40 focus:border-danger-500"
+                      : "border-line focus:border-accent-500",
+                  ].join(" ")}
+                />
+                {isDate && (
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-400">
+                    <CalendarIcon />
+                  </span>
+                )}
+              </div>
+              {fieldError && (
+                <p className="mt-1.5 text-xs text-danger-500">⚠️ {fieldError}</p>
+              )}
+              {!fieldError && missing && (
+                <p className="mt-1.5 text-xs text-danger-500">
+                  Пока пусто — будет поставлена пометка «[Заполнить: {check.label}]»
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-8 flex items-center justify-between">
@@ -92,10 +171,17 @@ export default function RequisitesForm({ values, onChange, onBack, onNext }: Req
         </button>
         <button
           type="button"
-          onClick={() => canProceed && onNext()}
-          className="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
+          onClick={onNext}
+          disabled={hasFormatErrors}
+          title={hasFormatErrors ? "Сначала исправьте ошибки в полях" : ""}
+          className={[
+            "rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-colors",
+            hasFormatErrors
+              ? "bg-ink-300 cursor-not-allowed"
+              : "bg-accent-600 hover:bg-accent-500",
+          ].join(" ")}
         >
-          Далее →
+          {allMissingFilled ? "Далее →" : "Пропустить (оставить пометки) →"}
         </button>
       </div>
     </section>

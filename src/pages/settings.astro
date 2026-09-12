@@ -10,44 +10,481 @@ const fields = [
 ---
 
 <AppLayout title="DocHelper — Настройки">
-  <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
-    <h1 class="text-xl font-semibold text-ink-900">Настройки</h1>
-    <p class="mt-1 text-sm text-ink-600">
-      Эти данные будут автоматически подставляться в реквизиты новых документов.
-    </p>
+  <div class="space-y-6">
+    <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+      <h1 class="text-xl font-semibold text-ink-900">Настройки</h1>
+      <p class="mt-1 text-sm text-ink-600">
+        Эти данные будут автоматически подставляться в реквизиты новых документов.
+      </p>
 
-    <form class="mt-6 space-y-5">
-      {fields.map((field) => (
-        <div>
-          <label for={field.id} class="text-sm text-ink-900">{field.label}</label>
-          <input
-            id={field.id}
-            type="text"
-            value={field.value}
-            class="mt-2 w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-accent-500"
-          />
+      <form id="profile-form" class="mt-6 space-y-5">
+        {fields.map((field) => (
+          <div>
+            <label for={field.id} class="text-sm text-ink-900">{field.label}</label>
+            <input
+              id={field.id}
+              name={field.id}
+              type="text"
+              value={field.value}
+              class="mt-2 w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-accent-500 outline-none"
+            />
+          </div>
+        ))}
+
+        <div class="flex items-center justify-between rounded-lg bg-surface px-4 py-3.5">
+          <div>
+            <p class="text-sm font-medium text-ink-900">Уведомления по почте</p>
+            <p class="text-xs text-ink-600">Сообщать, когда документ готов</p>
+          </div>
+          <label class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-accent-600">
+            <input type="checkbox" checked class="peer sr-only" />
+            <span class="inline-block h-[18px] w-[18px] translate-x-6 rounded-full bg-white transition-transform"></span>
+          </label>
         </div>
-      ))}
 
-      <div class="flex items-center justify-between rounded-lg bg-surface px-4 py-3.5">
-        <div>
-          <p class="text-sm font-medium text-ink-900">Уведомления по почте</p>
-          <p class="text-xs text-ink-600">Сообщать, когда документ готов</p>
+        <div class="flex justify-end pt-2">
+          <button
+            type="submit"
+            class="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
+          >
+            Сохранить изменения
+          </button>
         </div>
-        <label class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-accent-600">
-          <input type="checkbox" checked class="peer sr-only" />
-          <span class="inline-block h-[18px] w-[18px] translate-x-6 rounded-full bg-white transition-transform"></span>
-        </label>
-      </div>
+      </form>
+    </div>
 
-      <div class="flex justify-end pt-2">
-        <button
-          type="submit"
-          class="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
-        >
-          Сохранить изменения
-        </button>
+    <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+      <h2 class="text-lg font-semibold text-ink-900">Личная подпись ✍️</h2>
+      <p class="mt-1 text-sm text-ink-600">
+        Загрузите фото подписи или нарисуйте её прямо здесь. Рекомендуется PNG с прозрачным фоном.
+        Подпись будет подставляться во все генерируемые документы.
+      </p>
+
+      <div class="mt-6 space-y-5">
+        <!-- Превью текущей подписи -->
+        <div id="signature-current" class="rounded-xl border border-line bg-surface/60 p-5 hidden">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-sm font-medium text-ink-900 mb-2">Текущая подпись</p>
+              <div class="rounded-lg border border-line bg-white p-3 shadow-sm inline-block">
+                <img id="signature-preview" class="max-h-24 max-w-72 object-contain" alt="Текущая подпись" />
+              </div>
+            </div>
+            <button
+              id="signature-clear"
+              type="button"
+              class="shrink-0 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+            >
+              🗑 Удалить
+            </button>
+          </div>
+        </div>
+
+        <div id="signature-empty" class="rounded-xl border border-dashed border-line bg-surface/40 p-5 text-xs text-ink-500">
+          ⚠️ Подпись не загружена — в документах будет стандартная текстовая подпись.
+        </div>
+
+        <!-- Табы -->
+        <div class="inline-flex rounded-lg border border-line bg-surface p-1" role="tablist" id="sig-tabs">
+          <button type="button" role="tab" data-tab="upload"
+                  class="sig-tab-btn rounded-md px-4 py-1.5 text-xs font-medium text-ink-900 bg-white shadow-sm ring-1 ring-ink-900/5">
+            📤 Загрузить фото
+          </button>
+          <button type="button" role="tab" data-tab="draw"
+                  class="sig-tab-btn rounded-md px-4 py-1.5 text-xs font-medium text-ink-600 hover:bg-white/60">
+            ✏️ Нарисовать
+          </button>
+        </div>
+
+        <!-- Панель: Загрузить -->
+        <div id="sig-pane-upload" class="sig-pane">
+          <div class="rounded-xl border border-dashed border-line bg-surface/60 p-6">
+            <div class="flex flex-col items-center gap-4" id="signature-dropzone">
+              <label for="signature-input" id="signature-label"
+                     class="flex cursor-pointer flex-col items-center gap-2 rounded-lg px-6 py-4 text-center hover:bg-white/60 transition-colors w-full">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                     class="text-accent-500" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                  <polyline points="17 8 12 3 7 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round"/>
+                  <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div>
+                  <p class="text-sm font-medium text-ink-900">Нажмите или перетащите файл</p>
+                  <p class="mt-0.5 text-xs text-ink-500">PNG, JPG — до 5 МБ</p>
+                </div>
+              </label>
+              <input id="signature-input" type="file" accept="image/png,image/jpeg,image/jpg" class="sr-only" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Панель: Нарисовать -->
+        <div id="sig-pane-draw" class="sig-pane hidden">
+          <div class="rounded-xl border border-line bg-surface/60 p-5 space-y-4">
+            <!-- Инструменты рисования -->
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-2">
+                <label for="sig-pen-color" class="text-xs text-ink-600 shrink-0">Цвет:</label>
+                <input id="sig-pen-color" type="color" value="#0f172a"
+                       class="h-8 w-10 rounded-md border border-line bg-white cursor-pointer p-0.5" />
+              </div>
+              <div class="flex items-center gap-2">
+                <label for="sig-pen-size" class="text-xs text-ink-600 shrink-0">Толщина:</label>
+                <input id="sig-pen-size" type="range" min="1" max="9" value="3"
+                       class="h-2 w-32 accent-accent-500" />
+                <span id="sig-pen-size-label" class="text-xs text-ink-500 w-5">3</span>
+              </div>
+              <div class="flex items-center gap-2 ml-auto">
+                <button id="sig-undo" type="button"
+                        class="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed">
+                  ↶ Отмена
+                </button>
+                <button id="sig-clear-canvas" type="button"
+                        class="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface">
+                  🧹 Очистить
+                </button>
+              </div>
+            </div>
+            <!-- Canvas -->
+            <div class="rounded-lg border border-line bg-white shadow-inner p-1">
+              <canvas id="sig-canvas" width="720" height="220"
+                      class="w-full rounded touch-none bg-white cursor-crosshair block"
+                      style="aspect-ratio: 720 / 220;"></canvas>
+            </div>
+            <div class="flex justify-end">
+              <button id="sig-save-draw" type="button"
+                      class="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                ✅ Сохранить подпись
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="signature-status" class="text-xs text-success-600 min-h-[1rem]"></div>
       </div>
-    </form>
+    </div>
   </div>
 </AppLayout>
+
+<script>
+  const SIGNATURE_KEY = "dochelper:signature-image";
+  const PROFILE_KEY = "dochelper:profile";
+
+  const fileInput = document.getElementById("signature-input") as HTMLInputElement;
+  const previewImg = document.getElementById("signature-preview") as HTMLImageElement;
+  const previewCurrent = document.getElementById("signature-current") as HTMLDivElement;
+  const clearBtn = document.getElementById("signature-clear") as HTMLButtonElement;
+  const statusEl = document.getElementById("signature-status") as HTMLDivElement;
+  const emptyHint = document.getElementById("signature-empty") as HTMLDivElement;
+  const dropzone = document.getElementById("signature-dropzone") as HTMLDivElement;
+  const form = document.getElementById("profile-form") as HTMLFormElement;
+
+  // --- Tabs ---
+  const tabBtns = document.querySelectorAll(".sig-tab-btn") as NodeListOf<HTMLButtonElement>;
+  const paneUpload = document.getElementById("sig-pane-upload") as HTMLDivElement;
+  const paneDraw = document.getElementById("sig-pane-draw") as HTMLDivElement;
+  function switchTab(tab: "upload" | "draw") {
+    tabBtns.forEach((b) => {
+      const active = b.dataset.tab === tab;
+      b.classList.toggle("bg-white", active);
+      b.classList.toggle("shadow-sm", active);
+      b.classList.toggle("ring-1", active);
+      b.classList.toggle("ring-ink-900/5", active);
+      b.classList.toggle("text-ink-900", active);
+      b.classList.toggle("text-ink-600", !active);
+    });
+    paneUpload.classList.toggle("hidden", tab !== "upload");
+    paneDraw.classList.toggle("hidden", tab !== "draw");
+  }
+  tabBtns.forEach((b) =>
+    b.addEventListener("click", () => switchTab((b.dataset.tab as "upload" | "draw") ?? "upload")),
+  );
+
+  // --- Status / Storage helpers ---
+  function showStatus(text: string, isError = false) {
+    statusEl.textContent = text;
+    statusEl.className = "text-xs min-h-[1rem] " + (isError ? "text-danger-600" : "text-success-600");
+    if (text) {
+      setTimeout(() => {
+        if (statusEl.textContent === text) statusEl.textContent = "";
+      }, 3500);
+    }
+  }
+
+  function loadSignature() {
+    try {
+      const stored = localStorage.getItem(SIGNATURE_KEY);
+      if (stored) {
+        previewImg.src = stored;
+        previewCurrent.classList.remove("hidden");
+        clearBtn.classList.remove("hidden");
+        emptyHint.classList.add("hidden");
+      } else {
+        previewCurrent.classList.add("hidden");
+        clearBtn.classList.add("hidden");
+        emptyHint.classList.remove("hidden");
+      }
+    } catch (e) {
+      console.warn("Не удалось загрузить подпись", e);
+    }
+  }
+
+  function saveSignature(base64: string) {
+    try {
+      localStorage.setItem(SIGNATURE_KEY, base64);
+      showStatus("✅ Подпись сохранена");
+      loadSignature();
+    } catch (e) {
+      showStatus("❌ Не удалось сохранить (файл слишком большой?)", true);
+    }
+  }
+
+  function clearSignature() {
+    localStorage.removeItem(SIGNATURE_KEY);
+    if (fileInput) fileInput.value = "";
+    showStatus("Подпись удалена");
+    loadSignature();
+    clearCanvas();
+  }
+
+  // --- Upload logic ---
+  function processFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      showStatus("❌ Можно загружать только изображения", true);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showStatus("❌ Размер файла не должен превышать 5 МБ", true);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      saveSignature(result);
+    };
+    reader.onerror = () => showStatus("❌ Ошибка чтения файла", true);
+    reader.readAsDataURL(file);
+  }
+
+  fileInput?.addEventListener("change", (e) => {
+    const target = e.target as HTMLInputElement;
+    if (target.files && target.files[0]) processFile(target.files[0]);
+  });
+
+  clearBtn?.addEventListener("click", clearSignature);
+
+  if (dropzone) {
+    ["dragenter", "dragover"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("bg-accent-50/40");
+      }),
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("bg-accent-50/40");
+      }),
+    );
+    dropzone.addEventListener("drop", (e) => {
+      const evt = e as DragEvent;
+      if (evt.dataTransfer?.files?.[0]) processFile(evt.dataTransfer.files[0]);
+    });
+  }
+
+  // --- Canvas drawing logic ---
+  const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement | null;
+  const penColor = document.getElementById("sig-pen-color") as HTMLInputElement | null;
+  const penSize = document.getElementById("sig-pen-size") as HTMLInputElement | null;
+  const penSizeLabel = document.getElementById("sig-pen-size-label") as HTMLSpanElement | null;
+  const undoBtn = document.getElementById("sig-undo") as HTMLButtonElement | null;
+  const clearCanvasBtn = document.getElementById("sig-clear-canvas") as HTMLButtonElement | null;
+  const saveDrawBtn = document.getElementById("sig-save-draw") as HTMLButtonElement | null;
+
+  let isDrawing = false;
+  let lastX = 0;
+  let lastY = 0;
+  const strokeHistory: ImageData[] = [];
+  let hasStrokes = false;
+
+  function getCtx() {
+    return canvas?.getContext("2d");
+  }
+
+  function canvasScale(): { kx: number; ky: number } {
+    if (!canvas) return { kx: 1, ky: 1 };
+    const rect = canvas.getBoundingClientRect();
+    return { kx: canvas.width / rect.width, ky: canvas.height / rect.height };
+  }
+
+  function pushUndoSnapshot() {
+    const ctx = getCtx();
+    if (!ctx || !canvas) return;
+    const snap = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    strokeHistory.push(snap);
+    if (strokeHistory.length > 30) strokeHistory.shift();
+    updateUndoBtn();
+  }
+
+  function updateUndoBtn() {
+    if (!undoBtn) return;
+    undoBtn.disabled = strokeHistory.length === 0;
+  }
+
+  function updateSaveBtn() {
+    if (!saveDrawBtn) return;
+    saveDrawBtn.disabled = !hasStrokes;
+  }
+
+  function clearCanvas() {
+    const ctx = getCtx();
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokeHistory.length = 0;
+    hasStrokes = false;
+    updateUndoBtn();
+    updateSaveBtn();
+  }
+
+  function undoStroke() {
+    const ctx = getCtx();
+    if (!ctx || !canvas || strokeHistory.length === 0) return;
+    const prev = strokeHistory.pop()!;
+    ctx.putImageData(prev, 0, 0);
+    hasStrokes = strokeHistory.length > 0;
+    // Проверим, что в data что-то рисовано действительно (на случай очистки)
+    const data = prev.data;
+    let any = false;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) { any = true; break; }
+    hasStrokes = any;
+    updateUndoBtn();
+    updateSaveBtn();
+  }
+
+  function getPenPoint(e: PointerEvent) {
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const { kx, ky } = canvasScale();
+    return { x: (e.clientX - rect.left) * kx, y: (e.clientY - rect.top) * ky };
+  }
+
+  function startStroke(e: PointerEvent) {
+    const ctx = getCtx();
+    if (!ctx) return;
+    pushUndoSnapshot();
+    isDrawing = true;
+    const { x, y } = getPenPoint(e);
+    lastX = x; lastY = y;
+    hasStrokes = true;
+    updateSaveBtn();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    // Точка нажатия (для одиночных кликов)
+    const r = Number(penSize?.value ?? 3) / 2;
+    ctx.fillStyle = penColor?.value ?? "#0f172a";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawStroke(e: PointerEvent) {
+    if (!isDrawing) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const { x, y } = getPenPoint(e);
+    ctx.strokeStyle = penColor?.value ?? "#0f172a";
+    ctx.lineWidth = Number(penSize?.value ?? 3);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    lastX = x; lastY = y;
+  }
+
+  function endStroke() {
+    isDrawing = false;
+  }
+
+  if (canvas) {
+    canvas.addEventListener("pointerdown", startStroke);
+    canvas.addEventListener("pointermove", drawStroke);
+    canvas.addEventListener("pointerup", endStroke);
+    canvas.addEventListener("pointerleave", endStroke);
+    canvas.addEventListener("pointercancel", endStroke);
+  }
+
+  penSize?.addEventListener("input", () => {
+    if (penSizeLabel) penSizeLabel.textContent = String(penSize.value);
+  });
+
+  undoBtn?.addEventListener("click", undoStroke);
+  clearCanvasBtn?.addEventListener("click", clearCanvas);
+
+  /** Обрезает пустые прозрачные края на canvas, чтобы подпись была компактной. */
+  function trimCanvasToContent(src: HTMLCanvasElement): HTMLCanvasElement {
+    const ctx = src.getContext("2d")!;
+    const w = src.width, h = src.height;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let found = false;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const a = data[(y * w + x) * 4 + 3];
+        if (a > 0) {
+          found = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (!found) return src;
+    const pad = 12;
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(w - 1, maxX + pad);
+    maxY = Math.min(h - 1, maxY + pad);
+    const outW = maxX - minX + 1;
+    const outH = maxY - minY + 1;
+    const out = document.createElement("canvas");
+    out.width = outW; out.height = outH;
+    const outCtx = out.getContext("2d")!;
+    outCtx.drawImage(src, minX, minY, outW, outH, 0, 0, outW, outH);
+    return out;
+  }
+
+  saveDrawBtn?.addEventListener("click", () => {
+    if (!canvas || !hasStrokes) {
+      showStatus("❌ Сначала нарисуйте подпись", true);
+      return;
+    }
+    try {
+      const trimmed = trimCanvasToContent(canvas);
+      const dataUrl = trimmed.toDataURL("image/png");
+      saveSignature(dataUrl);
+    } catch (e) {
+      showStatus("❌ Не удалось сохранить подпись", true);
+    }
+  });
+
+  updateUndoBtn();
+  updateSaveBtn();
+
+  // --- Profile form ---
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const data: Record<string, string> = {};
+    formData.forEach((v, k) => (data[k] = String(v)));
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+    showStatus("✅ Настройки профиля сохранены");
+  });
+
+  loadSignature();
+</script>

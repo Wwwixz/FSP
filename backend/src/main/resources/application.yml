@@ -1,0 +1,43 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: docgen-backend
+  servlet:
+    multipart:
+      max-file-size: 10MB
+
+app:
+  cors:
+    # Список разрешённых источников; "*" разрешает все (MVP/демо)
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+  documents:
+    # Сколько сессий документов хранится в памяти (защита от переполнения)
+    max-sessions: 200
+    session-ttl-minutes: 240
+    # Имя организации, подставляемое в верхний колонтитул шаблона A,
+    # если его не удалось определить из черновика
+    default-organization: ""
+
+# --- Настройки ИИ -------------------------------------------------------
+# AI_PROVIDER:
+#   mock   — встроенный детерминированный провайдер (работает без ключей,
+#            подходит для демонстрации и проверки офлайн-сценариев);
+#   openai — любой OpenAI-совместимый API (OpenAI, локальные модели через
+#            OpenAI-совместимый шлюз и т.п.).
+ai:
+  provider: ${AI_PROVIDER:mock}
+  api-key: ${AI_API_KEY:}
+  base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+  model: ${AI_MODEL:gpt-4o-mini}
+  timeout-ms: ${AI_TIMEOUT_MS:60000}
+  # Просить ли у API строгий JSON-режим (response_format=json_object).
+  # Для локальных моделей иногда нужно выключить.
+  json-mode: ${AI_JSON_MODE:true}
+  # Имитировать недоступность ИИ (для демонстрации сценария 6 ТЗ)
+  simulate-failure: ${AI_SIMULATE_FAILURE:false}
+
+logging:
+  level:
+    ru.docgen: INFO
