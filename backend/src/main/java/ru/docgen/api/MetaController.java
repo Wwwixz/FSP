@@ -41,10 +41,11 @@ public class MetaController {
     public Dto.HealthDto health() {
         boolean openAi = "openai".equalsIgnoreCase(aiProperties.getProvider())
                 && aiProperties.isOpenAiConfigured();
-        return new Dto.HealthDto(true, "ok",
-                openAi ? "openai" : "mock",
-                openAi,
-                aiProperties.isSimulateFailure());
+        boolean gigachat = "gigachat".equalsIgnoreCase(aiProperties.getProvider())
+                && aiProperties.isGigachatConfigured();
+        String provider = openAi ? "openai" : gigachat ? "gigachat" : "mock";
+        boolean configured = openAi || gigachat;
+        return new Dto.HealthDto(true, "ok", provider, configured, aiProperties.isSimulateFailure());
     }
 
     @GetMapping("/document-types")

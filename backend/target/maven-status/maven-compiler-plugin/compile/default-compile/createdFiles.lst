@@ -3,6 +3,7 @@ ru\docgen\api\DocumentService.class
 ru\docgen\api\dto\Dto$RequisiteCheckDto.class
 ru\docgen\docx\DocxGenerationService$GenerationResult.class
 ru\docgen\requisites\RequisitesService.class
+ru\docgen\ai\GigaChatProvider$Token.class
 ru\docgen\docx\DocumentValues.class
 ru\docgen\ai\AIResult.class
 ru\docgen\ai\AIProperties.class
@@ -11,6 +12,7 @@ ru\docgen\core\GeneratedDocument.class
 ru\docgen\api\MetaController.class
 ru\docgen\api\dto\Dto$HealthDto.class
 ru\docgen\api\dto\Dto$RequisitesDto.class
+ru\docgen\config\DotEnv.class
 ru\docgen\DocgenApplication.class
 ru\docgen\docx\AbstractLayoutBuilder.class
 ru\docgen\requisites\RequisitesValidation.class
@@ -35,6 +37,7 @@ ru\docgen\api\dto\Dto$ApiError.class
 ru\docgen\ai\AIConfiguration.class
 ru\docgen\requisites\RequisitesValidation$RequisiteCheck.class
 ru\docgen\api\dto\Dto$GeneratedDocumentDto.class
+ru\docgen\ai\GigaChatProvider.class
 ru\docgen\api\dto\Dto$ProcessResponse.class
 ru\docgen\api\dto\Dto$RequisitesUpdateRequest.class
 ru\docgen\core\DocumentType.class

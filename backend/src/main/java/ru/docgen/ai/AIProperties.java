@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "ai")
 public class AIProperties {
 
-    /** mock | openai */
+    /** mock | openai | gigachat */
     private String provider = "mock";
 
     private String apiKey = "";
@@ -20,6 +20,22 @@ public class AIProperties {
     private long timeoutMs = 60_000;
 
     private boolean jsonMode = true;
+
+    // --- GigaChat (Сбер, OpenAI-совместимый) ---
+    /** Authorization key из кабинета Сбера (base64 client_id:client_secret). */
+    private String gigachatAuthKey = "";
+    /** scope: GIGACHAT_API_PERS / GIGACHAT_API_CORP / GIGACHAT_API_B2B. */
+    private String gigachatScope = "GIGACHAT_API_PERS";
+    /** OAuth-эндпоинт получения access_token. */
+    private String gigachatOauthUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth";
+    /** Базовый URL API GigaChat. */
+    private String gigachatBaseUrl = "https://api.giga.chat";
+    private String gigachatModel = "GigaChat";
+    /**
+     * Dev-флаг: отключить строгую проверку TLS (сертификаты НУЦ Минцифры
+     * не доверены из-пределов РФ-инфраструктуры). НЕ включать в продакшене!
+     */
+    private boolean gigachatInsecureSsl = false;
 
     /** Имитация недоступности ИИ для демонстрации сценария 6. */
     private boolean simulateFailure = false;
@@ -82,5 +98,57 @@ public class AIProperties {
 
     public boolean isOpenAiConfigured() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public String getGigachatAuthKey() {
+        return gigachatAuthKey;
+    }
+
+    public void setGigachatAuthKey(String gigachatAuthKey) {
+        this.gigachatAuthKey = gigachatAuthKey;
+    }
+
+    public String getGigachatScope() {
+        return gigachatScope;
+    }
+
+    public void setGigachatScope(String gigachatScope) {
+        this.gigachatScope = gigachatScope;
+    }
+
+    public String getGigachatOauthUrl() {
+        return gigachatOauthUrl;
+    }
+
+    public void setGigachatOauthUrl(String gigachatOauthUrl) {
+        this.gigachatOauthUrl = gigachatOauthUrl;
+    }
+
+    public String getGigachatBaseUrl() {
+        return gigachatBaseUrl;
+    }
+
+    public void setGigachatBaseUrl(String gigachatBaseUrl) {
+        this.gigachatBaseUrl = gigachatBaseUrl;
+    }
+
+    public String getGigachatModel() {
+        return gigachatModel;
+    }
+
+    public void setGigachatModel(String gigachatModel) {
+        this.gigachatModel = gigachatModel;
+    }
+
+    public boolean isGigachatInsecureSsl() {
+        return gigachatInsecureSsl;
+    }
+
+    public void setGigachatInsecureSsl(boolean gigachatInsecureSsl) {
+        this.gigachatInsecureSsl = gigachatInsecureSsl;
+    }
+
+    public boolean isGigachatConfigured() {
+        return gigachatAuthKey != null && !gigachatAuthKey.isBlank();
     }
 }

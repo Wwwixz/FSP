@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
-Test set: ru.docgen.MockAIProviderTest
+Test set: ru.docgen.ai.GagachatProviderTest
 -------------------------------------------------------------------------------
-Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in ru.docgen.MockAIProviderTest
+Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.120 s -- in ru.docgen.ai.GagachatProviderTest

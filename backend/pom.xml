@@ -32,6 +32,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Apache HttpClient5 — нужен для HttpComponentsClientHttpRequestFactory
+             с кастомным SSL-контекстом (dev-режим: TrustAll для НУЦ Минцифры). -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
+
         <!-- Генерация DOCX -->
         <dependency>
             <groupId>org.apache.poi</groupId>

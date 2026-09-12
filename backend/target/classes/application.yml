@@ -22,10 +22,13 @@ app:
 
 # --- Настройки ИИ -------------------------------------------------------
 # AI_PROVIDER:
-#   mock   — встроенный детерминированный провайдер (работает без ключей,
-#            подходит для демонстрации и проверки офлайн-сценариев);
-#   openai — любой OpenAI-совместимый API (OpenAI, локальные модели через
-#            OpenAI-совместимый шлюз и т.п.).
+#   mock      — встроенный детерминированный провайдер (работает без ключей,
+#               подходит для демонстрации и проверки офлайн-сценариев);
+#   openai    — любой OpenAI-совместимый API, ключ AI_API_KEY;
+#   gigachat  — GigaChat (Сбер), OpenAI-совместимый API, двухступенчатая
+#               OAuth2 авторизация через AI_GIGACHAT_AUTH_KEY.
+#               Токен обновляется автоматически. При сертификатах НУЦ
+#               Минцифры на локальной разработке включить AI_GIGACHAT_INSECURE_SSL=true.
 ai:
   provider: ${AI_PROVIDER:mock}
   api-key: ${AI_API_KEY:}
@@ -37,6 +40,13 @@ ai:
   json-mode: ${AI_JSON_MODE:true}
   # Имитировать недоступность ИИ (для демонстрации сценария 6 ТЗ)
   simulate-failure: ${AI_SIMULATE_FAILURE:false}
+  # --- Провайдер GigaChat (Сбер) ---
+  gigachat-auth-key: ${AI_GIGACHAT_AUTH_KEY:}
+  gigachat-scope: ${AI_GIGACHAT_SCOPE:GIGACHAT_API_PERS}
+  gigachat-oauth-url: ${AI_GIGACHAT_OAUTH_URL:https://ngw.devices.sberbank.ru:9443/api/v2/oauth}
+  gigachat-base-url: ${AI_GIGACHAT_BASE_URL:https://api.giga.chat}
+  gigachat-model: ${AI_GIGACHAT_MODEL:GigaChat-2}
+  gigachat-insecure-ssl: ${AI_GIGACHAT_INSECURE_SSL:false}
 
 logging:
   level:

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="ru.docgen.MockAIProviderTest" time="0.006" tests="7" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="ru.docgen.ai.GigaChatProviderTest" time="0.124" tests="10" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="26"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -10,7 +10,6 @@
     <property name="user.variant" value=""/>
     <property name="java.vendor.url" value="https://java.oracle.com/"/>
     <property name="user.timezone" value="Europe/Moscow"/>
-    <property name="org.jboss.logging.provider" value="slf4j"/>
     <property name="os.name" value="Windows 11"/>
     <property name="java.vm.specification.version" value="26"/>
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
@@ -31,8 +30,6 @@
     <property name="line.separator" value="&#10;"/>
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
-    <property name="FILE_LOG_CHARSET" value="UTF-8"/>
-    <property name="java.awt.headless" value="true"/>
     <property name="surefire.real.class.path" value="C:\Users\Admin\AppData\Local\Temp\surefire11938741329452580337\surefirebooter-20260912182905515_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
@@ -51,9 +48,7 @@
     <property name="user.dir" value="C:\Users\Admin\IdeaProjects\FSP\backend"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="PID" value="39580"/>
     <property name="sun.os.patch.level" value=""/>
-    <property name="CONSOLE_LOG_CHARSET" value="UTF-8"/>
     <property name="native.encoding" value="Cp1251"/>
     <property name="java.library.path" value="C:\Users\Admin\.jdks\openjdk-26.0.2.1\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\VulkanSDK\1.4.350.0\Bin;C:\Program Files\Microsoft MPI\Bin\;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\dotnet\;C:\Program Files\Git\cmd;C:\Program Files\Tailscale\;C:\Program Files\Microsoft SQL Server\170\Tools\Binn\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files\Sunshine;C:\Program Files\Sunshine\tools;C:\Program Files\CMake\bin;C:\Program Files\CMake\bin;C:\Program Files\nodejs\;C:\Users\Admin\AppData\Local\Programs\Python\Python314\Scripts\;C:\Users\Admin\AppData\Local\Programs\Python\Python314\;C:\Users\Admin\AppData\Local\Programs\Python\Launcher\;C:\Users\Admin\.cargo\bin;C:\Users\Admin\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.4\bin;C:\Users\Admin\.dotnet\tools;C:\Users\Admin\AppData\Local\Programs\Ollama;C:\Users\Admin\.lmstudio\bin;C:\Program Files\JetBrains\DataGrip 2025.3.5\bin;C:\Users\Admin\.dotnet\tools;C:\Users\Admin\AppData\Local\Programs\Microsoft VS Code\bin;C:\mingw64\bin;C:\Program Files\JetBrains\IntelliJ IDEA 2026.2.2\bin;C:\Users\Admin\AppData\Roaming\npm;."/>
     <property name="java.vm.info" value="mixed mode, sharing"/>
@@ -63,13 +58,15 @@
     <property name="stdin.encoding" value="Cp1251"/>
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="70.0"/>
-    <property name="LOGGED_APPLICATION_NAME" value="[docgen-backend] "/>
   </properties>
-  <testcase name="presentFactsArePreserved" classname="ru.docgen.MockAIProviderTest" time="0.001"/>
-  <testcase name="organizationExtractedForHeader" classname="ru.docgen.MockAIProviderTest" time="0.001"/>
-  <testcase name="colloquialStyleIsImproved" classname="ru.docgen.MockAIProviderTest" time="0.001"/>
-  <testcase name="serviceLinesRemovedFromBody" classname="ru.docgen.MockAIProviderTest" time="0.0"/>
-  <testcase name="dateNormalizedToRuFormat" classname="ru.docgen.MockAIProviderTest" time="0.001"/>
-  <testcase name="proseAuthorExtracted" classname="ru.docgen.MockAIProviderTest" time="0.0"/>
-  <testcase name="missingRecipientIsNotInvented" classname="ru.docgen.MockAIProviderTest" time="0.001"/>
+  <testcase name="missingAccessTokenThrows" classname="ru.docgen.ai.GigaChatProviderTest" time="0.047"/>
+  <testcase name="tokenWithoutExpiryNeverAutoRefreshs" classname="ru.docgen.ai.GigaChatProviderTest" time="0.002"/>
+  <testcase name="tokenNoRefreshFarFromExpiry" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="parsesExpiresAtInMilliseconds" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="unknownExpiryLeavesExpiresAtNull" classname="ru.docgen.ai.GigaChatProviderTest" time="0.0"/>
+  <testcase name="tokenExpiresAtBoundary" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="parsesExpiresAtIsoString" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="parsesTokenNestedInData" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="parsesAccessTokenAndExpiresIn" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
+  <testcase name="tokenNeedsRefreshInsideMargin" classname="ru.docgen.ai.GigaChatProviderTest" time="0.001"/>
 </testsuite>
