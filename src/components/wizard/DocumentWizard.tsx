@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Stepper from "./Stepper";
 import Step1TextInput from "./Step1TextInput";
 import Step2TypeTemplate from "./Step2TypeTemplate";
@@ -18,6 +18,12 @@ import type {
   TemplateId,
 } from "../../types/wizard";
 import { DOCUMENT_TYPES } from "../../types/wizard";
+import {
+  getCorporateTemplates,
+  getCustomDocTypes,
+  type CorporateTemplate,
+  type CustomDocType,
+} from "../../lib/scalability";
 
 type RequisiteValues = Record<string, string>;
 
@@ -88,6 +94,25 @@ export default function DocumentWizard() {
   );
   const [documentType, setDocumentType] = useState<DocumentTypeId>("memo");
   const [template, setTemplate] = useState<TemplateId>("standard");
+  const [selectedCustomTypeId, setSelectedCustomTypeId] = useState<string | null>(null);
+  const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useState<string | null>(null);
+  const [extraDocumentTypes, setExtraDocumentTypes] = useState<CustomDocType[]>([]);
+  const [extraTemplates, setExtraTemplates] = useState<CorporateTemplate[]>([]);
+
+  useEffect(() => {
+    setExtraDocumentTypes(getCustomDocTypes());
+    setExtraTemplates(getCorporateTemplates());
+  }, []);
+
+  const handleDocumentTypeChange = (id: DocumentTypeId, customId: string | null) => {
+    setDocumentType(id);
+    setSelectedCustomTypeId(customId);
+  };
+
+  const handleTemplateChange = (id: TemplateId, customId: string | null) => {
+    setTemplate(id);
+    setSelectedCustomTemplateId(customId);
+  };
 
   // Loading + errors state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -244,6 +269,8 @@ export default function DocumentWizard() {
     setRawText("");
     setDocumentType("memo");
     setTemplate("standard");
+    setSelectedCustomTypeId(null);
+    setSelectedCustomTemplateId(null);
     setImprovedText("");
     setRequisiteValues(DEFAULT_REQUISITES);
     setProcessResponse(null);
@@ -271,6 +298,8 @@ export default function DocumentWizard() {
         onCreateNew={handleCreateNew}
         downloadUrl={generateResponse?.downloadUrl}
         fileName={generateResponse?.fileName}
+        documentId={processResponse?.documentId}
+        documentTypeLabel={labelOfType(processResponse?.documentType ?? documentType)}
       />
     );
   }
@@ -327,7 +356,11 @@ export default function DocumentWizard() {
             rawText={rawText}
             onModeChange={setInputMode}
             onTextChange={setRawText}
-            onDocumentTypeHint={(id) => id && setDocumentType(id)}
+            onDocumentTypeHint={(id) => {
+              if (!id) return;
+              setDocumentType(id);
+              setSelectedCustomTypeId(null);
+            }}
             onNext={goToStep2}
           />
         )}
@@ -337,8 +370,12 @@ export default function DocumentWizard() {
             <Step2TypeTemplate
               documentType={documentType}
               template={template}
-              onDocumentTypeChange={setDocumentType}
-              onTemplateChange={setTemplate}
+              selectedCustomTypeId={selectedCustomTypeId}
+              selectedCustomTemplateId={selectedCustomTemplateId}
+              extraDocumentTypes={extraDocumentTypes}
+              extraTemplates={extraTemplates}
+              onDocumentTypeChange={handleDocumentTypeChange}
+              onTemplateChange={handleTemplateChange}
               onBack={() => setStep(1)}
               onNext={goToProcess}
             />

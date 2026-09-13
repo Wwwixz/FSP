@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
+import ScalabilitySettings from "../components/ScalabilitySettings";
 
 const fields = [
   { id: "full-name", label: "ФИО", value: "Сидоров М.В." },
@@ -166,6 +167,15 @@ const fields = [
         <div id="signature-status" class="text-xs text-success-600 min-h-[1rem]"></div>
       </div>
     </div>
+
+    <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+      <h2 class="text-lg font-semibold text-ink-900">Возможности масштабирования</h2>
+      <p class="mt-1 text-sm text-ink-600">
+        Как DocHelper растёт вместе с потребностями организации.
+      </p>
+    </div>
+
+    <ScalabilitySettings client:load />
   </div>
 </AppLayout>
 

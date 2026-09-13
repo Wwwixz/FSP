@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { getSedIntegration, markDocumentSentToSed, type SedIntegration } from "../lib/scalability";
 
 interface DocEntry {
   id: string;
   name: string;
   type: string;
   date: string;
+  sedSentAt?: string;
 }
 
 const STORAGE_KEY = "dochelper_documents";
@@ -33,14 +35,21 @@ function removeDocument(id: string) {
 export default function DocumentsList() {
   const [docs, setDocs] = useState<DocEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [sed, setSed] = useState<SedIntegration | null>(null);
 
   useEffect(() => {
     setDocs(loadDocuments());
+    setSed(getSedIntegration());
     setLoaded(true);
   }, []);
 
   const handleDelete = (id: string) => {
     const updated = removeDocument(id);
+    setDocs(updated);
+  };
+
+  const handleSendToSed = (id: string) => {
+    const updated = markDocumentSentToSed(id);
     setDocs(updated);
   };
 
@@ -102,6 +111,23 @@ export default function DocumentsList() {
             <p className="truncate text-sm font-medium text-ink-900">{doc.name}</p>
             <p className="text-xs text-ink-400">{TYPE_LABELS[doc.type] || doc.type} · {doc.date}</p>
           </div>
+          {doc.sedSentAt ? (
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-xs font-medium text-success-600">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="7" fill="currentColor" fillOpacity="0.2" />
+                <path d="M5 8.2L7.1 10.3L11.2 5.9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Отправлено в СЭД
+            </span>
+          ) : sed ? (
+            <button
+              type="button"
+              onClick={() => handleSendToSed(doc.id)}
+              className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-200 hover:bg-accent-50 hover:text-accent-600"
+            >
+              Отправить в СЭД
+            </button>
+          ) : null}
           <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               type="button"

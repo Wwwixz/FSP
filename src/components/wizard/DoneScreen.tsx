@@ -1,7 +1,11 @@
+import { useEffect } from "react";
+
 interface DoneScreenProps {
   onCreateNew: () => void;
   downloadUrl?: string;
   fileName?: string;
+  documentId?: string;
+  documentTypeLabel?: string;
 }
 
 function DocumentCheckIcon() {
@@ -46,8 +50,32 @@ export default function DoneScreen({
   onCreateNew,
   downloadUrl,
   fileName = "document.docx",
+  documentId,
+  documentTypeLabel = "Документ",
 }: DoneScreenProps) {
   const href = downloadUrl ?? undefined;
+
+  useEffect(() => {
+    if (!documentId || typeof window === "undefined") return;
+    try {
+      const STORAGE_KEY = "dochelper_documents";
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const docs = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(docs) && !docs.some((d) => d.id === documentId)) {
+        docs.push({
+          id: documentId,
+          name: fileName,
+          type: documentTypeLabel,
+          date: new Date().toLocaleDateString("ru-RU"),
+        });
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
+      }
+    } catch {
+      // localStorage недоступен — просто пропускаем сохранение в список
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentId]);
+
   return (
     <div className="rounded-2xl border border-line bg-card px-6 py-14 text-center shadow-sm shadow-ink-900/[0.03]">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-accent-50 text-accent-600">

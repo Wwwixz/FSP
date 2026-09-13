@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
+import CorporateTemplatesList from "../components/CorporateTemplatesList";
 ---
 
 <AppLayout title="DocHelper — Шаблоны">
@@ -95,5 +96,7 @@ import AppLayout from "../layouts/AppLayout.astro";
         </a>
       </div>
     </div>
+
+    <CorporateTemplatesList client:load />
   </div>
 </AppLayout>
