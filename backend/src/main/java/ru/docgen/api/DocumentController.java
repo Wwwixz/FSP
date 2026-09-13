@@ -207,6 +207,11 @@ public class DocumentController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Не удалось собрать архив документов");
         }
+    /** Отправить готовый DOCX в подключённую СЭД. */
+    @PostMapping("/{documentId}/send-to-sed")
+    public Dto.SedSendResponse sendToSed(@PathVariable String documentId,
+                                         @RequestBody Dto.SedSendRequest request) {
+        return service.sendToSed(documentId, request);
     }
 
     /** Список сформированных документов (для раздела «Мои документы»). */

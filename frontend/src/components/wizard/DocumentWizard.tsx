@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Stepper from "./Stepper";
 import Step1TextInput from "./Step1TextInput";
 import Step2TypeTemplate from "./Step2TypeTemplate";
@@ -27,6 +27,12 @@ import type {
   TemplateOptions,
 } from "../../types/wizard";
 import { DEFAULT_TEMPLATE_OPTIONS, DOCUMENT_TYPES } from "../../types/wizard";
+import {
+  getCorporateTemplates,
+  getCustomDocTypes,
+  type CorporateTemplate,
+  type CustomDocType,
+} from "../../lib/scalability";
 
 type RequisiteValues = Record<string, string>;
 type ExportFormat = "docx" | "pdf";
@@ -115,6 +121,26 @@ export default function DocumentWizard() {
   const [uploadedTemplate, setUploadedTemplate] = useState<string | null>(() =>
     getStoredImage("dochelper:uploaded-template"),
   );
+  // Пользовательские типы документов и корпоративные шаблоны (Настройки → масштабирование)
+  const [selectedCustomTypeId, setSelectedCustomTypeId] = useState<string | null>(null);
+  const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useState<string | null>(null);
+  const [extraDocumentTypes, setExtraDocumentTypes] = useState<CustomDocType[]>([]);
+  const [extraTemplates, setExtraTemplates] = useState<CorporateTemplate[]>([]);
+
+  useEffect(() => {
+    setExtraDocumentTypes(getCustomDocTypes());
+    setExtraTemplates(getCorporateTemplates());
+  }, []);
+
+  const handleDocumentTypeChange = (id: DocumentTypeId, customId: string | null) => {
+    setDocumentType(id);
+    setSelectedCustomTypeId(customId);
+  };
+
+  const handleTemplateChange = (id: TemplateId, customId: string | null) => {
+    setTemplate(id);
+    setSelectedCustomTemplateId(customId);
+  };
 
   // Loading + errors state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -301,6 +327,8 @@ export default function DocumentWizard() {
     setDocumentType("memo");
     setTemplate("standard");
     setTemplateOptions(DEFAULT_TEMPLATE_OPTIONS);
+    setSelectedCustomTypeId(null);
+    setSelectedCustomTemplateId(null);
     setImprovedText("");
     setRequisiteValues(DEFAULT_REQUISITES);
     setProcessResponse(null);
@@ -394,8 +422,12 @@ export default function DocumentWizard() {
               template={template}
               templateOptions={templateOptions}
               uploadedTemplate={uploadedTemplate}
-              onDocumentTypeChange={setDocumentType}
-              onTemplateChange={setTemplate}
+              extraDocumentTypes={extraDocumentTypes}
+              extraTemplates={extraTemplates}
+              selectedCustomTypeId={selectedCustomTypeId}
+              selectedCustomTemplateId={selectedCustomTemplateId}
+              onDocumentTypeChange={handleDocumentTypeChange}
+              onTemplateChange={handleTemplateChange}
               onTemplateOptionsChange={setTemplateOptions}
               onUploadedTemplateChange={(v) => {
                 setUploadedTemplate(v);

@@ -1,15 +1,15 @@
 ## 🧞 Commands
 
-Все команды в терминале:
+Команды frontend выполняются из папки `frontend`:
 
 | Command                   | Action                                           |
 | :------------------------ | :----------------------------------------------- |
-| `npm install`             | Установить зависимости                           |
-| `npm run dev`             | Запустить локальный сервер `localhost:4321`      |
-| `npm run build`           | Скомпилировать ваш рабочий сайт в `./dist/`      |
-| `npm run preview`         | Предварительно просмотрите сборку локально перед развертыванием     |
-| `npm run astro ...`       | Выполнять команды интерфейса командной строки, такие как `astro add`, `astro check` |
-| `npm run astro -- --help` | Получить помощь по использованию Astro CLI       |
+| `cd frontend; npm install`             | Установить зависимости                           |
+| `cd frontend; npm run dev`             | Запустить локальный сервер `localhost:4321`      |
+| `cd frontend; npm run build`           | Скомпилировать ваш рабочий сайт в `frontend/dist/`      |
+| `cd frontend; npm run preview`         | Предварительно просмотреть сборку локально перед развертыванием     |
+| `cd frontend; npm run astro ...`       | Выполнять команды интерфейса командной строки, такие как `astro add`, `astro check` |
+| `cd frontend; npm run astro -- --help` | Получить помощь по использованию Astro CLI       |
 
 ## Backend и ИИ-провайдеры
 

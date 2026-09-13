@@ -111,6 +111,12 @@ public final class Dto {
     public record RefineResponse(boolean success, String improvedText, String warning) {
     }
 
+    public record SedSendRequest(String apiUrl, String apiKey, String systemName) {
+    }
+
+    public record SedSendResponse(boolean success, String message) {
+    }
+
     public record ValidateRequest(String text, String documentType) {
     }
 

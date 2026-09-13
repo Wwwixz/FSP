@@ -1,12 +1,17 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
 import ProfileEditor from "../components/ProfileEditor";
+import ScalabilitySettings from "../components/ScalabilitySettings";
 ---
 
 <AppLayout title="DocHelper — Настройки">
   <div class="space-y-6">
     <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
       <ProfileEditor client:load />
+    </div>
+
+    <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+      <ScalabilitySettings client:load />
     </div>
 
     <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
@@ -122,6 +127,15 @@ import ProfileEditor from "../components/ProfileEditor";
         <div id="signature-status" class="text-xs text-success-600 min-h-[1rem]"></div>
       </div>
     </div>
+
+    <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
+      <h2 class="text-lg font-semibold text-ink-900">Возможности масштабирования</h2>
+      <p class="mt-1 text-sm text-ink-600">
+        Как DocHelper растёт вместе с потребностями организации.
+      </p>
+    </div>
+
+    <ScalabilitySettings client:load />
   </div>
 </AppLayout>
 

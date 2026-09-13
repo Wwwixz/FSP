@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getSedIntegration, type SedIntegration } from "../lib/scalability";
 
 interface DocEntry {
   id: string;
@@ -20,6 +21,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
   standard: "Классический",
   modern: "Современный",
   custom: "Свой шаблон",
+  uploaded: "Бланк организации",
 };
 
 function formatDate(iso: string): string {
@@ -38,14 +40,18 @@ function formatDate(iso: string): string {
 
 /**
  * «Мои документы»: все сформированные файлы хранятся на сервере
- * (in-memory, согласно ТЗ) — доступны для просмотра и скачивания,
- * пока работает бэкенд.
+ * (in-memory, согласно ТЗ) — доступны для просмотра, скачивания,
+ * выгрузки архивом и отправки в подключённую СЭД.
  */
 export default function DocumentsList() {
   const [docs, setDocs] = useState<DocEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocEntry | null>(null);
+  const [sed, setSed] = useState<SedIntegration | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sedSent, setSedSent] = useState<Set<string>>(new Set());
+  const [sedMsg, setSedMsg] = useState<{ text: string; err?: boolean } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -66,6 +72,7 @@ export default function DocumentsList() {
 
   useEffect(() => {
     refresh();
+    setSed(getSedIntegration());
   }, [refresh]);
 
   // Закрытие просмотра по Escape
@@ -77,6 +84,30 @@ export default function DocumentsList() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewDoc]);
+
+  const sendToSed = async (doc: DocEntry) => {
+    if (!sed || sendingId) return;
+    setSendingId(doc.id);
+    setSedMsg(null);
+    try {
+      const res = await fetch(`/api/documents/${doc.id}/send-to-sed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ apiUrl: sed.apiUrl, apiKey: sed.apiKey, systemName: sed.systemName }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setSedMsg({ text: json?.error?.message ?? "Не удалось отправить в СЭД", err: true });
+        return;
+      }
+      setSedSent((prev) => new Set(prev).add(doc.id));
+      setSedMsg({ text: json.message ?? `Документ «${doc.fileName}» отправлен в СЭД` });
+    } catch {
+      setSedMsg({ text: "СЭД недоступна — проверьте адрес в настройках", err: true });
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   if (!loaded) {
     return (
@@ -144,6 +175,18 @@ export default function DocumentsList() {
           🗂 Скачать всё архивом (ZIP)
         </a>
       </div>
+
+      {sedMsg && (
+        <div
+          className={[
+            "rounded-xl px-4 py-3 text-sm",
+            sedMsg.err ? "border border-danger-100 bg-danger-50 text-danger-600" : "border border-success-100 bg-success-50 text-success-600",
+          ].join(" ")}
+        >
+          {sedMsg.text}
+        </div>
+      )}
+
       {docs.map((doc) => {
         const isPdf = doc.fileName.toLowerCase().endsWith(".pdf");
         return (
@@ -172,7 +215,28 @@ export default function DocumentsList() {
                 {TEMPLATE_LABELS[doc.templateId] || doc.templateId} · {formatDate(doc.createdAt)}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {sedSent.has(doc.id) ? (
+                <span className="flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-xs font-medium text-success-600">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="7" fill="currentColor" fillOpacity="0.2" />
+                    <path d="M5 8.2L7.1 10.3L11.2 5.9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  В СЭД
+                </span>
+              ) : (
+                sed && (
+                  <button
+                    type="button"
+                    onClick={() => sendToSed(doc)}
+                    disabled={sendingId === doc.id}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-200 hover:bg-accent-50 hover:text-accent-600"
+                    title={`Отправить в ${sed.systemName || "СЭД"}`}
+                  >
+                    {sendingId === doc.id ? "Отправка…" : "В СЭД"}
+                  </button>
+                )
+              )}
               <button
                 type="button"
                 onClick={() => setPreviewDoc(doc)}
