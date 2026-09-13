@@ -6,6 +6,14 @@ import Step3Review from "./Step3Review";
 import RequisitesForm from "./RequisitesForm";
 import PreviewDocument from "./PreviewDocument";
 import DoneScreen from "./DoneScreen";
+import StampPad, { STAMP_STORAGE_KEY } from "./StampPad";
+import {
+  loadProfile,
+  profileAuthorLine,
+  profileExecutorLine,
+  profileIsComplete,
+  shortName,
+} from "../../lib/profile";
 import type {
   ApiError,
   DocumentTypeId,
@@ -16,37 +24,52 @@ import type {
   ResultPhase,
   StepId,
   TemplateId,
+  TemplateOptions,
 } from "../../types/wizard";
-import { DOCUMENT_TYPES } from "../../types/wizard";
+import { DEFAULT_TEMPLATE_OPTIONS, DOCUMENT_TYPES } from "../../types/wizard";
 
 type RequisiteValues = Record<string, string>;
+type ExportFormat = "docx" | "pdf";
 
 const DEFAULT_REQUISITES: RequisiteValues = {};
 const SIGNATURE_STORAGE_KEY = "dochelper:signature-image";
 const PHOTO_STORAGE_KEY = "dochelper:photo-image";
 
-function getStoredSignature(): string | null {
+function getStoredImage(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const v = window.localStorage.getItem(SIGNATURE_STORAGE_KEY);
+    const v = window.localStorage.getItem(key);
     return v && v.trim() ? v : null;
   } catch {
     return null;
   }
 }
 
-function getStoredPhoto(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const v = window.localStorage.getItem(PHOTO_STORAGE_KEY);
-    return v && v.trim() ? v : null;
-  } catch {
-    return null;
-  }
+function triggerDownload(url: string, fileName: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
-function labelOfType(id: DocumentTypeId): string {
-  return DOCUMENT_TYPES.find((t) => t.id === id)?.label ?? id;
+/**
+ * Подставляет данные профиля в пустые реквизиты — в том числе для
+ * демо-примеров, чтобы документ всегда содержал данные пользователя,
+ * а не вымышленные из примера.
+ */
+function applyProfileAutofill(values: RequisiteValues): RequisiteValues {
+  const profile = loadProfile();
+  if (!profileIsComplete(profile)) {
+    return values;
+  }
+  const next = { ...values };
+  if (!next.author?.trim()) next.author = profileAuthorLine(profile);
+  if (!next.organization?.trim()) next.organization = profile.organization;
+  if (!next.signature?.trim() && profile.fullName.trim()) next.signature = shortName(profile.fullName);
+  if (!next.executor?.trim()) next.executor = profileExecutorLine(profile);
+  return next;
 }
 
 function toClientChecks(resp: ProcessResponse): RequisiteCheck[] {
@@ -88,6 +111,10 @@ export default function DocumentWizard() {
   );
   const [documentType, setDocumentType] = useState<DocumentTypeId>("memo");
   const [template, setTemplate] = useState<TemplateId>("standard");
+  const [templateOptions, setTemplateOptions] = useState<TemplateOptions>(DEFAULT_TEMPLATE_OPTIONS);
+  const [uploadedTemplate, setUploadedTemplate] = useState<string | null>(() =>
+    getStoredImage("dochelper:uploaded-template"),
+  );
 
   // Loading + errors state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -99,6 +126,8 @@ export default function DocumentWizard() {
   const [improvedText, setImprovedText] = useState<string>("");
   const [requisiteValues, setRequisiteValues] = useState<RequisiteValues>(DEFAULT_REQUISITES);
   const [generateResponse, setGenerateResponse] = useState<GenerateResponse | null>(null);
+  /** Последний успешный DOCX — чтобы кнопка «Скачать Word» не менялась после экспорта PDF. */
+  const [docxResponse, setDocxResponse] = useState<GenerateResponse | null>(null);
 
   // === API methods ===
   const callProcess = useCallback(async () => {
@@ -123,7 +152,12 @@ export default function DocumentWizard() {
       const data = json as ProcessResponse;
       setProcessResponse(data);
       setImprovedText(data.improvedText);
-      setRequisiteValues(initialValuesFromResponse(data));
+      // Реквизиты из текста + автоподстановка данных профиля в пустые поля
+      setRequisiteValues(applyProfileAutofill(initialValuesFromResponse(data)));
+      // Ссылки прошлого документа больше не действительны — сбрасываем,
+      // чтобы «Скачать» не отдавала чужой/старый файл
+      setGenerateResponse(null);
+      setDocxResponse(null);
       setResultPhase("review");
       setStep(3);
     } catch (e) {
@@ -140,8 +174,9 @@ export default function DocumentWizard() {
   const callUpdateRequisites = useCallback(async () => {
     if (!processResponse) return;
     try {
-      const signatureImage = getStoredSignature();
-      const photoImage = getStoredPhoto();
+      const signatureImage = getStoredImage(SIGNATURE_STORAGE_KEY);
+      const photoImage = getStoredImage(PHOTO_STORAGE_KEY);
+      const stampImage = getStoredImage(STAMP_STORAGE_KEY);
       const res = await fetch(
         `/api/documents/${processResponse.documentId}/requisites`,
         {
@@ -151,6 +186,7 @@ export default function DocumentWizard() {
             values: requisiteValues,
             signatureImage: signatureImage ?? undefined,
             photoImage: photoImage ?? undefined,
+            stampImage: stampImage ?? undefined,
           }),
         },
       );
@@ -171,18 +207,22 @@ export default function DocumentWizard() {
     }
   }, [processResponse, requisiteValues]);
 
-  const callGenerate = useCallback(async () => {
-    if (!processResponse) return;
+  const callGenerate = useCallback(async (format: ExportFormat = "docx", autoDownload = false) => {
+    if (!processResponse) return null;
     setIsGenerating(true);
     setAiError(null);
     try {
       const hasEdits = improvedText !== processResponse.improvedText;
-      const signatureImage = getStoredSignature();
-      const photoImage = getStoredPhoto();
-      const body: Record<string, unknown> = {};
+      const signatureImage = getStoredImage(SIGNATURE_STORAGE_KEY);
+      const photoImage = getStoredImage(PHOTO_STORAGE_KEY);
+      const stampImage = getStoredImage(STAMP_STORAGE_KEY);
+      const body: Record<string, unknown> = { format, origin: window.location.origin };
       if (hasEdits) body.finalText = improvedText;
       if (signatureImage) body.signatureImage = signatureImage;
       if (photoImage) body.photoImage = photoImage;
+      if (stampImage) body.stampImage = stampImage;
+      if (template === "custom") body.templateOptions = templateOptions;
+      if (template === "uploaded" && uploadedTemplate) body.uploadedTemplate = uploadedTemplate;
       const res = await fetch(
         `/api/documents/${processResponse.documentId}/generate`,
         {
@@ -199,20 +239,24 @@ export default function DocumentWizard() {
             message: "Не удалось сгенерировать документ",
           },
         );
-        return;
+        return null;
       }
       const data = json as GenerateResponse;
       setGenerateResponse(data);
-      setResultPhase("preview");
+      if (autoDownload) {
+        triggerDownload(data.downloadUrl, data.fileName);
+      }
+      return data;
     } catch (e) {
       setAiError({
         code: "NETWORK",
         message: "Не удалось сгенерировать файл — попробуйте ещё раз.",
       });
+      return null;
     } finally {
       setIsGenerating(false);
     }
-  }, [processResponse, improvedText]);
+  }, [processResponse, improvedText, template, templateOptions, uploadedTemplate]);
 
   // === Navigation handlers ===
   const goToStep2 = () => setStep(2);
@@ -225,16 +269,28 @@ export default function DocumentWizard() {
     const missing = (processResponse.missing ?? []).filter(
       (k) => !(requisiteValues[k] ?? "").trim(),
     );
-    setResultPhase(missing.length > 0 ? "requisites" : "preview");
-    // Если нет missing — сразу запустим генерацию (и перейдём в preview)
-    if (missing.length === 0 && resultPhase === "review") {
-      await callGenerate();
+    if (missing.length > 0) {
+      setResultPhase("requisites");
+      return;
+    }
+    const data = await callGenerate("docx");
+    if (data) {
+      setDocxResponse(data);
+      setResultPhase("preview");
     }
   };
   const handleRequisitesNext = async () => {
     // Отправить на сервер значения и сразу сгенерировать
     await callUpdateRequisites();
-    await callGenerate();
+    const data = await callGenerate("docx");
+    if (data) {
+      setDocxResponse(data);
+      setResultPhase("preview");
+    }
+  };
+  const handleDownloadPdf = async () => {
+    // Скачивание запускается сразу после генерации PDF
+    await callGenerate("pdf", true);
   };
 
   const handleCreateNew = () => {
@@ -244,10 +300,12 @@ export default function DocumentWizard() {
     setRawText("");
     setDocumentType("memo");
     setTemplate("standard");
+    setTemplateOptions(DEFAULT_TEMPLATE_OPTIONS);
     setImprovedText("");
     setRequisiteValues(DEFAULT_REQUISITES);
     setProcessResponse(null);
     setGenerateResponse(null);
+    setDocxResponse(null);
     setAiError(null);
   };
 
@@ -259,18 +317,13 @@ export default function DocumentWizard() {
     [processResponse],
   );
 
-  const previewRequisites = useMemo(
-    () => (processResponse ? processResponse.requisites : {}),
-    [processResponse],
-  );
-
   // === Views ===
   if (view === "done") {
     return (
       <DoneScreen
         onCreateNew={handleCreateNew}
-        downloadUrl={generateResponse?.downloadUrl}
-        fileName={generateResponse?.fileName}
+        downloadUrl={docxResponse?.downloadUrl}
+        fileName={docxResponse?.fileName}
       />
     );
   }
@@ -278,12 +331,14 @@ export default function DocumentWizard() {
   if (step === 3 && resultPhase === "preview") {
     return (
       <PreviewDocument
-        improvedText={improvedText}
-        documentTypeLabel={labelOfType(processResponse?.documentType ?? documentType)}
-        requisites={previewRequisites}
-        downloadUrl={generateResponse?.downloadUrl}
-        fileName={generateResponse?.fileName}
-        warnings={generateResponse?.warnings}
+        downloadUrl={docxResponse?.downloadUrl}
+        fileName={docxResponse?.fileName}
+        warnings={docxResponse?.warnings}
+        isGeneratingPdf={isGenerating}
+        onDownloadPdf={handleDownloadPdf}
+        documentId={docxResponse?.documentId}
+        qrDataUrl={docxResponse?.qrDataUrl}
+        previewUrl={docxResponse?.previewUrl}
         onDownload={() => setView("done")}
       />
     );
@@ -337,8 +392,20 @@ export default function DocumentWizard() {
             <Step2TypeTemplate
               documentType={documentType}
               template={template}
+              templateOptions={templateOptions}
+              uploadedTemplate={uploadedTemplate}
               onDocumentTypeChange={setDocumentType}
               onTemplateChange={setTemplate}
+              onTemplateOptionsChange={setTemplateOptions}
+              onUploadedTemplateChange={(v) => {
+                setUploadedTemplate(v);
+                try {
+                  if (v) window.localStorage.setItem("dochelper:uploaded-template", v);
+                  else window.localStorage.removeItem("dochelper:uploaded-template");
+                } catch {
+                  /* ignore */
+                }
+              }}
               onBack={() => setStep(1)}
               onNext={goToProcess}
             />
@@ -352,9 +419,12 @@ export default function DocumentWizard() {
 
         {step === 3 && resultPhase === "review" && (
           <Step3Review
+            rawText={rawText}
             improvedText={improvedText}
             onImprovedTextChange={setImprovedText}
             requisites={checksForUI}
+            documentId={processResponse?.documentId}
+            warnings={processResponse?.warnings}
             onBack={() => setStep(2)}
             onNext={handleReviewNext}
           />
@@ -371,7 +441,7 @@ export default function DocumentWizard() {
             />
             {isGenerating && (
               <div className="mt-4 rounded-xl bg-accent-50 p-4 text-sm text-accent-700">
-                ⏳ Формируем DOCX по выбранному шаблону…
+                ⏳ Формируем документ по выбранному шаблону…
               </div>
             )}
           </div>

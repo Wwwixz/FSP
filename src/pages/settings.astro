@@ -1,56 +1,12 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
-
-const fields = [
-  { id: "full-name", label: "ФИО", value: "Сидоров М.В." },
-  { id: "position", label: "Должность", value: "Руководитель отдела" },
-  { id: "department", label: "Подразделение", value: "Отдел развития" },
-  { id: "organization", label: "Организация", value: "ООО «Компания»" },
-];
+import ProfileEditor from "../components/ProfileEditor";
 ---
 
 <AppLayout title="DocHelper — Настройки">
   <div class="space-y-6">
     <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">
-      <h1 class="text-xl font-semibold text-ink-900">Настройки</h1>
-      <p class="mt-1 text-sm text-ink-600">
-        Эти данные будут автоматически подставляться в реквизиты новых документов.
-      </p>
-
-      <form id="profile-form" class="mt-6 space-y-5">
-        {fields.map((field) => (
-          <div>
-            <label for={field.id} class="text-sm text-ink-900">{field.label}</label>
-            <input
-              id={field.id}
-              name={field.id}
-              type="text"
-              value={field.value}
-              class="mt-2 w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-accent-500 outline-none"
-            />
-          </div>
-        ))}
-
-        <div class="flex items-center justify-between rounded-lg bg-surface px-4 py-3.5">
-          <div>
-            <p class="text-sm font-medium text-ink-900">Уведомления по почте</p>
-            <p class="text-xs text-ink-600">Сообщать, когда документ готов</p>
-          </div>
-          <label class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-accent-600">
-            <input type="checkbox" checked class="peer sr-only" />
-            <span class="inline-block h-[18px] w-[18px] translate-x-6 rounded-full bg-white transition-transform"></span>
-          </label>
-        </div>
-
-        <div class="flex justify-end pt-2">
-          <button
-            type="submit"
-            class="rounded-lg bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
-          >
-            Сохранить изменения
-          </button>
-        </div>
-      </form>
+      <ProfileEditor client:load />
     </div>
 
     <div class="rounded-2xl border border-line bg-card p-6 shadow-sm shadow-ink-900/[0.03]">

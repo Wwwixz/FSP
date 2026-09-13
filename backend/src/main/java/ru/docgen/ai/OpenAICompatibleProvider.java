@@ -59,6 +59,43 @@ public class OpenAICompatibleProvider implements AIService {
         return AIJsonParser.parse(content);
     }
 
+    private static final String REFINE_SYSTEM_PROMPT = """
+            Ты — редактор служебных документов российской организации. Примени инструкцию \
+            пользователя к тексту. Правила: СОХРАНИ ВСЕ факты без исключений — каждую дату, \
+            сумму, фамилию, номер и условие (потеря факта недопустима), ничего не выдумывай \
+            и не добавляй новых сведений, сохраняй официально-деловой стиль. Сокращая текст, \
+            убирай только лишние слова, а не сведения. Верни ТОЛЬКО итоговый текст — без \
+            пояснений, без кавычек вокруг, без markdown.""";
+
+    @Override
+    public String refine(String text, String instruction) {
+        if (properties.isSimulateFailure()) {
+            throw new AIUnavailableException("Симулированная недоступность ИИ (AI_SIMULATE_FAILURE=true)");
+        }
+        Map<String, Object> requestBody = Map.of(
+                "model", properties.getModel(),
+                "messages", List.of(
+                        Map.of("role", "system", "content", REFINE_SYSTEM_PROMPT),
+                        Map.of("role", "user", "content",
+                                "Инструкция: " + instruction + "\n\nТекст:\n---\n" + text + "\n---")),
+                "temperature", 0.3);
+        try {
+            Map<String, Object> response = restClient.post()
+                    .uri("/chat/completions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(Map.class);
+            return extractContent(response).trim();
+        } catch (AIParseException e) {
+            throw e;
+        } catch (AIException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AIUnavailableException("Не удалось обратиться к ИИ-сервису: " + e.getMessage(), e);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private String extractContent(Map<String, Object> response) {
         if (response == null) {

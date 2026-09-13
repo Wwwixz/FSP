@@ -25,4 +25,15 @@ public interface AIService {
      * @throws AIParseException       ответ не удалось разобрать
      */
     AIResult process(String text, DocumentType documentType);
+
+    /**
+     * Дорабатывает уже улучшенный текст по инструкции пользователя
+     * («сделай короче», «более официально», «добавь вежливости» и т.п.).
+     * Реализации должны сохранять все факты и ничего не выдумывать.
+     *
+     * @throws AIUnavailableException сервис недоступен
+     */
+    default String refine(String text, String instruction) {
+        throw new AIUnavailableException("Доработка текста недоступна у текущего ИИ-провайдера");
+    }
 }

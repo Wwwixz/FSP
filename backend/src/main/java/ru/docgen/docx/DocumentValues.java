@@ -27,14 +27,18 @@ public class DocumentValues {
     private final String bodyText;
     private final String signatureImage;
     private final String photoImage;
+    private final String stampImage;
+    private final String qrImage;
 
     public DocumentValues(DocumentType type, Map<RequisiteKey, String> requisites, String bodyText,
-                          String signatureImage, String photoImage) {
+                          String signatureImage, String photoImage, String stampImage, String qrImage) {
         this.type = type;
         this.requisites = requisites;
         this.bodyText = bodyText == null ? "" : bodyText;
         this.signatureImage = signatureImage;
         this.photoImage = photoImage;
+        this.stampImage = stampImage;
+        this.qrImage = qrImage;
     }
 
     public String signatureImageDataUrl() {
@@ -43,6 +47,14 @@ public class DocumentValues {
 
     public String photoImageDataUrl() {
         return photoImage;
+    }
+
+    public String stampImageDataUrl() {
+        return stampImage;
+    }
+
+    public String qrImageDataUrl() {
+        return qrImage;
     }
 
     /** Улучшенный содержательный текст документа. */

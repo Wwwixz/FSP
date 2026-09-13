@@ -11,7 +11,7 @@ export const STEPS: StepInfo[] = [
   { id: 3, label: "Результат" },
 ];
 
-export type InputMode = "manual" | "clipboard";
+export type InputMode = "manual" | "clipboard" | "upload";
 
 export type DocumentTypeId =
   | "memo"
@@ -31,7 +31,7 @@ export const DOCUMENT_TYPES: DocumentTypeOption[] = [
   { id: "letter", label: "Письмо" },
 ];
 
-export type TemplateId = "standard" | "modern";
+export type TemplateId = "standard" | "modern" | "custom" | "uploaded";
 
 export interface TemplateOption {
   id: TemplateId;
@@ -52,7 +52,42 @@ export const TEMPLATES: TemplateOption[] = [
     description:
       "Arial 12 pt, интервал 1,15, табличная шапка «Кому / От кого», подпись по центру, нижний колонтитул с названием документа и датой.",
   },
+  {
+    id: "custom",
+    title: "Свой шаблон",
+    description:
+      "Настройте оформление под себя: шрифт, размер, интервал, отступ, выравнивание, текст колонтитулов.",
+  },
+  {
+    id: "uploaded",
+    title: "Бланк моей организации",
+    description:
+      "Загрузите фирменный бланк (.docx) — документ будет оформлен на его основе: колонтитулы, поля и стили бланка сохранятся.",
+  },
 ];
+
+/** Параметры оформления «своего шаблона» (передаются в GenerateRequest.templateOptions). */
+export interface TemplateOptions {
+  font: string;
+  fontSize: string;
+  lineSpacing: string;
+  indent: string;
+  align: "justify" | "left" | "center" | "right";
+  header: string;
+  headerAlign: "left" | "center" | "right";
+  footer: string;
+}
+
+export const DEFAULT_TEMPLATE_OPTIONS: TemplateOptions = {
+  font: "Times New Roman",
+  fontSize: "14",
+  lineSpacing: "1.5",
+  indent: "1.25",
+  align: "justify",
+  header: "[Название организации]",
+  headerAlign: "center",
+  footer: "[Название документа] — [Дата]",
+};
 
 export type RequisiteStatus = "done" | "missing";
 
@@ -104,6 +139,7 @@ export interface ProcessResponse {
   requisites: RequisiteDto;
   checks: RequisiteCheckDto[];
   missing: string[];
+  warnings?: string[];
 }
 
 export interface DemoDraftDto {
@@ -119,6 +155,10 @@ export interface GenerateResponse {
   fileName: string;
   downloadUrl: string;
   warnings: string[];
+  /** Ссылка, зашитая в QR-код документа (просмотр в браузере). */
+  previewUrl?: string | null;
+  /** QR-код проверки подлинности (base64-dataURL) для показа на экране. */
+  qrDataUrl?: string | null;
 }
 
 export interface ApiError {

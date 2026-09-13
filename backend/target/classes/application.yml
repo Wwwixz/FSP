@@ -7,6 +7,18 @@ spring:
   servlet:
     multipart:
       max-file-size: 10MB
+  mail:
+    # Отправка документов по почте: MAIL_USERNAME + MAIL_PASSWORD в backend/.env.
+    # По умолчанию Mail.ru; для Яндекса: MAIL_HOST=smtp.yandex.ru
+    host: ${MAIL_HOST:smtp.mail.ru}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 15000
 
 app:
   cors:

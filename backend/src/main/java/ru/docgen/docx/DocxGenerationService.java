@@ -19,6 +19,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,25 +45,34 @@ public class DocxGenerationService {
     }
 
     /**
-     * @param bodyText       улучшенный содержательный текст (без служебных строк)
-     * @param requisites     подготовленные значения реквизитов
-     * @param signatureImage изображение подписи в base64-dataURL (опционально)
-     * @param photoImage     фото автора документа в base64-dataURL (опционально)
+     * @param type            тип документа
+     * @param template        шаблон оформления
+     * @param requisites      подготовленные значения реквизитов
+     * @param bodyText        улучшенный содержательный текст (без служебных строк)
+     * @param signatureImage  изображение подписи в base64-dataURL (опционально)
+     * @param photoImage      фото автора документа в base64-dataURL (опционально)
+     * @param stampImage      печать организации в base64-dataURL (опционально)
+     * @param templateOptions параметры «своего шаблона» (опционально)
+     * @param qrImage         QR-код проверки подлинности в base64-dataURL (опционально)
      * @return готовый DOCX и предупреждения (например о запасном шаблоне)
      */
     public GenerationResult generate(DocumentType type, TemplateKind template,
                                      Map<RequisiteKey, String> requisites, String bodyText,
-                                     String signatureImage, String photoImage) {
+                                     String signatureImage, String photoImage,
+                                     String stampImage, String qrImage,
+                                     String uploadedTemplate, Map<String, String> templateOptions) {
         TemplateKind chosen = template;
         List<String> warnings = new ArrayList<>();
         byte[] docx;
         try {
-            docx = buildDocx(type, chosen, requisites, bodyText, signatureImage, photoImage);
+            docx = buildDocx(type, chosen, requisites, bodyText, signatureImage, photoImage,
+                    stampImage, qrImage, uploadedTemplate, templateOptions);
         } catch (Exception e) {
             log.warn("Шаблон {} повреждён или недоступен: {}", chosen.getId(), e.getMessage());
             TemplateKind fallback = chosen == TemplateKind.STANDARD ? TemplateKind.MODERN : TemplateKind.STANDARD;
             try {
-                docx = buildDocx(type, fallback, requisites, bodyText, signatureImage, photoImage);
+                docx = buildDocx(type, fallback, requisites, bodyText, signatureImage, photoImage,
+                        stampImage, qrImage, uploadedTemplate, templateOptions);
                 warnings.add("Выбранный шаблон повреждён или недоступен, применён запасной шаблон «"
                         + fallback.getTitle() + "».");
                 chosen = fallback;
@@ -71,14 +81,28 @@ public class DocxGenerationService {
                         fallbackError);
             }
         }
-        return new GenerationResult(docx, buildFileName(type), warnings);
+        return new GenerationResult(docx, buildFileName(type, "docx"), warnings);
     }
 
     private byte[] buildDocx(DocumentType type, TemplateKind template,
                              Map<RequisiteKey, String> requisites, String bodyText,
-                             String signatureImage, String photoImage) throws IOException {
-        try (InputStream in = new ClassPathResource(template.getResourcePath()).getInputStream();
-             XWPFDocument document = new XWPFDocument(in)) {
+                             String signatureImage, String photoImage, String stampImage,
+                             String qrImage, String uploadedTemplate,
+                             Map<String, String> templateOptions) throws IOException {
+        // «Свой шаблон» строится программно, без базового .docx из ресурсов
+        if (template == TemplateKind.CUSTOM) {
+            return buildCustomDocx(type, requisites, bodyText, signatureImage, photoImage,
+                    stampImage, qrImage, templateOptions);
+        }
+        // «Бланк моей организации»: оформление по загруженному пользователем .docx —
+        // колонтитулы, поля и стили бланка сохраняются (преимущество по ТЗ 1.6).
+        InputStream in;
+        if (template == TemplateKind.UPLOADED) {
+            in = new ByteArrayInputStream(decodeDocx(uploadedTemplate));
+        } else {
+            in = new ClassPathResource(template.getResourcePath()).getInputStream();
+        }
+        try (in; XWPFDocument document = new XWPFDocument(in)) {
 
             // Очищаем содержательную часть, сохраняя параметры раздела и колонтитулы
             for (int i = document.getBodyElements().size() - 1; i >= 0; i--) {
@@ -86,15 +110,60 @@ public class DocxGenerationService {
             }
 
             StyleResolver styles = StyleResolver.of(document);
-            DocumentValues values = new DocumentValues(type, requisites, bodyText, signatureImage, photoImage);
+            DocumentValues values = new DocumentValues(type, requisites, bodyText,
+                    signatureImage, photoImage, stampImage, qrImage);
 
-            AbstractLayoutBuilder builder = template == TemplateKind.STANDARD
-                    ? new StandardLayoutBuilder(document, type, values, styles)
-                    : new ModernLayoutBuilder(document, type, values, styles);
+            AbstractLayoutBuilder builder = template == TemplateKind.MODERN
+                    ? new ModernLayoutBuilder(document, type, values, styles)
+                    : new StandardLayoutBuilder(document, type, values, styles);
             builder.build();
+            builder.appendQrBlock();
 
             replaceHeaderFooterPlaceholders(document, type, values);
 
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            document.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /** Декодирует base64-dataURL бланка; ошибка => запасной шаблон (устойчивость по ТЗ 2.3). */
+    private static byte[] decodeDocx(String dataUrl) throws IOException {
+        if (dataUrl == null || dataUrl.isBlank()) {
+            throw new IOException("Бланк не передан");
+        }
+        String cleaned = dataUrl.replaceAll("\\s+", "");
+        int comma = cleaned.indexOf(',');
+        String b64 = comma >= 0 ? cleaned.substring(comma + 1) : cleaned;
+        byte[] bytes;
+        try {
+            try {
+                bytes = Base64.getDecoder().decode(b64);
+            } catch (IllegalArgumentException e) {
+                bytes = Base64.getUrlDecoder().decode(b64);
+            }
+        } catch (Exception e) {
+            throw new IOException("Некорректная base64-строка бланка");
+        }
+        // .docx — это ZIP-архив: проверяем сигнатуру PK
+        if (bytes.length < 4 || bytes[0] != 'P' || bytes[1] != 'K') {
+            throw new IOException("Файл не является документом .docx");
+        }
+        return bytes;
+    }
+
+    private byte[] buildCustomDocx(DocumentType type, Map<RequisiteKey, String> requisites,
+                                   String bodyText, String signatureImage, String photoImage,
+                                   String stampImage, String qrImage,
+                                   Map<String, String> templateOptions) throws IOException {
+        try (XWPFDocument document = CustomLayoutBuilder.createBaseDocument(templateOptions)) {
+            StyleResolver styles = StyleResolver.of(document);
+            DocumentValues values = new DocumentValues(type, requisites, bodyText,
+                    signatureImage, photoImage, stampImage, qrImage);
+            CustomLayoutBuilder customBuilder = new CustomLayoutBuilder(document, type, values, styles, templateOptions);
+            customBuilder.build();
+            customBuilder.appendQrBlock();
+            replaceHeaderFooterPlaceholders(document, type, values);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             document.write(out);
             return out.toByteArray();
@@ -151,11 +220,11 @@ public class DocxGenerationService {
         }
     }
 
-    private String buildFileName(DocumentType type) {
+    private String buildFileName(DocumentType type, String extension) {
         String base = type.getLabel()
                 .toLowerCase(Locale.ROOT)
                 .replace(' ', '_');
-        return base + "_" + LocalDate.now().format(FILE_DATE) + ".docx";
+        return base + "_" + LocalDate.now().format(FILE_DATE) + "." + extension;
     }
 
     /**

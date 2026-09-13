@@ -22,6 +22,12 @@ public class ProcessedDocument {
     private String signatureImage;
     /** Фото (аватар) автора документа в формате base64-dataURL (опционально). */
     private String photoImage;
+    /** Печать организации в формате base64-dataURL (опционально). */
+    private String stampImage;
+    /** Параметры «своего шаблона» (сохраняются для повторного просмотра/экспорта). */
+    private Map<String, String> templateOptions;
+    /** Фирменный бланк пользователя (.docx, base64) — оформление по его файлу. */
+    private String uploadedTemplate;
     /** Порядковый номер документа внутри сессии, используется при автозаполнении номера. */
     private int numberSequence = 1;
 
@@ -92,6 +98,30 @@ public class ProcessedDocument {
 
     public void setPhotoImage(String photoImage) {
         this.photoImage = photoImage;
+    }
+
+    public String getStampImage() {
+        return stampImage;
+    }
+
+    public void setStampImage(String stampImage) {
+        this.stampImage = stampImage;
+    }
+
+    public Map<String, String> getTemplateOptions() {
+        return templateOptions;
+    }
+
+    public void setTemplateOptions(Map<String, String> templateOptions) {
+        this.templateOptions = templateOptions;
+    }
+
+    public String getUploadedTemplate() {
+        return uploadedTemplate;
+    }
+
+    public void setUploadedTemplate(String uploadedTemplate) {
+        this.uploadedTemplate = uploadedTemplate;
     }
 
     public synchronized int nextNumber() {

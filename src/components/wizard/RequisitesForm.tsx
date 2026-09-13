@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RequisiteCheckDto } from "../../types/wizard";
+import { loadContacts, removeContact, saveContact } from "../../lib/contacts";
 
 interface RequisitesFormProps {
   checks: RequisiteCheckDto[];
@@ -70,6 +71,9 @@ export default function RequisitesForm({
   const missingChecks = checks.filter((c) => c.status === "missing");
   const allMissingFilled = missingChecks.every((c) => (values[c.key] ?? "").trim().length > 0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [contacts, setContacts] = useState<string[]>(() => loadContacts());
+  const recipientValue = values.recipient ?? "";
+  const recipientSaved = contacts.includes(recipientValue.trim());
 
   const validateField = (key: string, value: string): string | null => {
     if (key === "date" && !isValidDateFormat(value)) {
@@ -108,6 +112,38 @@ export default function RequisitesForm({
           <p className="rounded-lg bg-success-50 p-4 text-sm text-ink-900">
             Все обязательные реквизиты заполнены ✅
           </p>
+        )}
+
+        {/* Адресная книга: быстрая подстановка сохранённых получателей */}
+        {contacts.length > 0 && missingChecks.some((c) => c.key === "recipient") && (
+          <div>
+            <p className="text-xs font-medium text-ink-500">Адресная книга — нажмите, чтобы подставить:</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {contacts.map((contact) => (
+                <span
+                  key={contact}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-line bg-white py-1 pl-3 pr-1 text-xs text-ink-900"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setValue("recipient", contact)}
+                    className="max-w-64 truncate hover:text-accent-600"
+                    title={contact}
+                  >
+                    {contact}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContacts(removeContact(contact))}
+                    aria-label={`Удалить ${contact} из адресной книги`}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-danger-50 hover:text-danger-500"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
         )}
 
         {missingChecks.map((check) => {
@@ -155,6 +191,15 @@ export default function RequisitesForm({
                 <p className="mt-1.5 text-xs text-danger-500">
                   Пока пусто — будет поставлена пометка «[Заполнить: {check.label}]»
                 </p>
+              )}
+              {check.key === "recipient" && recipientValue.trim().length > 3 && !recipientSaved && (
+                <button
+                  type="button"
+                  onClick={() => setContacts(saveContact(recipientValue))}
+                  className="mt-2 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+                >
+                  💾 Сохранить получателя в адресную книгу
+                </button>
               )}
             </div>
           );

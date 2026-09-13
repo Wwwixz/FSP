@@ -121,6 +121,31 @@ public class MockAIProvider implements AIService {
                     "чтобы обеспечить бесперебойную работу сотрудников")
     );
 
+    /**
+     * Офлайн-доработка: детерминированные преобразования по ключевым словам
+     * инструкции (для демонстрации без ключей). Факты не изменяются.
+     */
+    @Override
+    public String refine(String text, String instruction) {
+        if (text == null || text.isBlank()) {
+            return text;
+        }
+        String ins = instruction == null ? "" : instruction.toLowerCase(java.util.Locale.ROOT);
+        if (ins.contains("короче") || ins.contains("кратче") || ins.contains("сокращ")) {
+            String[] sentences = text.split("(?<=\\.)\\s+");
+            return String.join(" ", java.util.Arrays.copyOfRange(
+                    sentences, 0, Math.min(2, sentences.length)));
+        }
+        if (ins.contains("вежлив")) {
+            return "Уважаемые коллеги!\n\n" + text + "\n\nЗаранее благодарим за содействие.";
+        }
+        if (ins.contains("подробн")) {
+            return text + " О наступлении сроков прошу уведомить дополнительно.";
+        }
+        // «официальнее» и всё прочее: текст уже приведён к деловому стилю
+        return text;
+    }
+
     @Override
     public AIResult process(String text, DocumentType documentType) {
         if (text == null || text.isBlank()) {

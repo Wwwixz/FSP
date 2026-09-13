@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface DocEntry {
   id: string;
-  name: string;
-  type: string;
-  date: string;
+  fileName: string;
+  documentType: string;
+  templateId: string;
+  createdAt: string;
+  downloadUrl: string;
 }
-
-const STORAGE_KEY = "dochelper_documents";
 
 const TYPE_LABELS: Record<string, string> = {
   memo: "Служебная записка",
@@ -16,33 +16,67 @@ const TYPE_LABELS: Record<string, string> = {
   letter: "Письмо",
 };
 
-function loadDocuments(): DocEntry[] {
+const TEMPLATE_LABELS: Record<string, string> = {
+  standard: "Классический",
+  modern: "Современный",
+  custom: "Свой шаблон",
+};
+
+function formatDate(iso: string): string {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return [];
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
 
-function removeDocument(id: string) {
-  const docs = loadDocuments().filter((d) => d.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
-  return docs;
-}
-
+/**
+ * «Мои документы»: все сформированные файлы хранятся на сервере
+ * (in-memory, согласно ТЗ) — доступны для просмотра и скачивания,
+ * пока работает бэкенд.
+ */
 export default function DocumentsList() {
   const [docs, setDocs] = useState<DocEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocEntry | null>(null);
 
-  useEffect(() => {
-    setDocs(loadDocuments());
-    setLoaded(true);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/documents");
+      if (!res.ok) {
+        setError("Не удалось загрузить список документов");
+        return;
+      }
+      const json = await res.json();
+      setDocs(Array.isArray(json) ? (json as DocEntry[]) : []);
+      setError(null);
+    } catch {
+      setError("Сервис недоступен — запустите бэкенд и обновите страницу");
+    } finally {
+      setLoaded(true);
+    }
   }, []);
 
-  const handleDelete = (id: string) => {
-    const updated = removeDocument(id);
-    setDocs(updated);
-  };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // Закрытие просмотра по Escape
+  useEffect(() => {
+    if (!previewDoc) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewDoc(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [previewDoc]);
 
   if (!loaded) {
     return (
@@ -60,6 +94,14 @@ export default function DocumentsList() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="rounded-xl border border-warning-100 bg-warning-50 p-5 text-sm text-ink-900">
+        {error}
+      </div>
+    );
+  }
+
   if (docs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
@@ -70,8 +112,10 @@ export default function DocumentsList() {
             <path d="M12 20H22M12 24H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </div>
-        <h3 className="mt-4 text-base font-medium text-ink-900">Нет документов</h3>
-        <p className="mt-1 text-sm text-ink-600">Создайте первый документ, и он появится здесь.</p>
+        <h3 className="mt-4 text-base font-medium text-ink-900">Пока нет документов</h3>
+        <p className="mt-1 text-sm text-ink-600">
+          Создайте документ — он сохранится здесь, и его можно будет скачать повторно.
+        </p>
         <a
           href="/"
           className="btn-press mt-5 inline-flex items-center gap-2 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-500"
@@ -87,35 +131,121 @@ export default function DocumentsList() {
 
   return (
     <div className="stagger-children space-y-2">
-      {docs.map((doc) => (
-        <div
-          key={doc.id}
-          className="group flex items-center gap-3 rounded-xl border border-line bg-white p-4 transition-all duration-200 hover:border-accent-100 hover:shadow-sm"
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-100 bg-accent-50/50 px-4 py-3">
+        <p className="text-sm text-ink-900">
+          Документов: <span className="font-semibold">{docs.length}</span> — все хранятся на сервере
+        </p>
+        <a
+          href="/api/documents/archive"
+          download
+          className="rounded-lg bg-accent-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-accent-500"
+          title="Все файлы одним ZIP-архивом со списком"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600 transition-colors group-hover:bg-accent-100">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M4 2H9.5L12.5 5V13.5C12.5 14.05 12.05 14.5 11.5 14.5H4.5C3.95 14.5 3.5 14.05 3.5 13.5V2.5C3.5 1.95 3.95 2 4 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-              <path d="M9.3 2V5H12.3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-            </svg>
+          🗂 Скачать всё архивом (ZIP)
+        </a>
+      </div>
+      {docs.map((doc) => {
+        const isPdf = doc.fileName.toLowerCase().endsWith(".pdf");
+        return (
+          <div
+            key={doc.id}
+            className="group flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white p-4 transition-all duration-200 hover:border-accent-100 hover:shadow-sm"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600 transition-colors group-hover:bg-accent-100">
+              {isPdf ? (
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 2H9.5L12.5 5V13.5C12.5 14.05 12.05 14.5 11.5 14.5H4.5C3.95 14.5 3.5 14.05 3.5 13.5V2.5C3.5 1.95 3.95 2 4 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                  <path d="M9.3 2V5H12.3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                  <path d="M6 9.5H7.2C7.9 9.5 8.3 9.1 8.3 8.5C8.3 7.9 7.9 7.5 7.2 7.5H6V11.5" stroke="currentColor" strokeWidth="0.9" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M4 2H9.5L12.5 5V13.5C12.5 14.05 12.05 14.5 11.5 14.5H4.5C3.95 14.5 3.5 14.05 3.5 13.5V2.5C3.5 1.95 3.95 2 4 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                  <path d="M9.3 2V5H12.3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink-900">{doc.fileName}</p>
+              <p className="text-xs text-ink-400">
+                {TYPE_LABELS[doc.documentType] || doc.documentType} ·{" "}
+                {TEMPLATE_LABELS[doc.templateId] || doc.templateId} · {formatDate(doc.createdAt)}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(doc)}
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+                title="Посмотреть документ прямо на сайте"
+              >
+                Просмотр
+              </button>
+              <a
+                href={doc.downloadUrl}
+                download={doc.fileName}
+                className="rounded-lg bg-accent-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-500"
+              >
+                Скачать
+              </a>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink-900">{doc.name}</p>
-            <p className="text-xs text-ink-400">{TYPE_LABELS[doc.type] || doc.type} · {doc.date}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={() => handleDelete(doc.id)}
-              aria-label="Удалить"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-danger-50 hover:text-danger-500"
-            >
-              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
-                <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-            </button>
+        );
+      })}
+
+      {previewDoc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 backdrop-blur-sm"
+          onClick={() => setPreviewDoc(null)}
+        >
+          <div
+            className="flex h-full max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink-900">{previewDoc.fileName}</p>
+                <p className="text-xs text-ink-400">
+                  {TYPE_LABELS[previewDoc.documentType] || previewDoc.documentType} ·{" "}
+                  {formatDate(previewDoc.createdAt)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={`/api/documents/${previewDoc.id}/preview`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+                >
+                  В новой вкладке
+                </a>
+                <a
+                  href={previewDoc.downloadUrl}
+                  download={previewDoc.fileName}
+                  className="rounded-lg bg-accent-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-500"
+                >
+                  Скачать
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  aria-label="Закрыть просмотр"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-danger-50 hover:text-danger-500"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={`/api/documents/${previewDoc.id}/preview`}
+              title={`Просмотр: ${previewDoc.fileName}`}
+              className="h-full w-full flex-1 bg-surface"
+            />
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

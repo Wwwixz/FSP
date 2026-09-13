@@ -115,6 +115,31 @@ public class GigaChatProvider implements AIService {
         return AIJsonParser.parse(content);
     }
 
+    /** Системный промпт доработки: только текст, без выдумок. */
+    private static final String REFINE_SYSTEM_PROMPT = """
+            Ты — редактор служебных документов российской организации. Примени инструкцию \
+            пользователя к тексту. Правила: СОХРАНИ ВСЕ факты без исключений — каждую дату, \
+            сумму, фамилию, номер и условие (потеря факта недопустима), ничего не выдумывай \
+            и не добавляй новых сведений, сохраняй официально-деловой стиль. Сокращая текст, \
+            убирай только лишние слова, а не сведения. Верни ТОЛЬКО итоговый текст — без \
+            пояснений, без кавычек вокруг, без markdown.""";
+
+    @Override
+    public String refine(String text, String instruction) {
+        Token current = getValidToken();
+        Map<String, Object> body = new LinkedHashMap<>();
+        String model = properties.getGigachatModel();
+        if (model != null && !model.isBlank()) {
+            body.put("model", model);
+        }
+        body.put("messages", List.of(
+                Map.of("role", "system", "content", REFINE_SYSTEM_PROMPT),
+                Map.of("role", "user", "content", "Инструкция: " + instruction
+                        + "\n\nТекст:\n---\n" + text + "\n---")));
+        body.put("temperature", 0.3);
+        return chatBody(current, body, 1).trim();
+    }
+
     // ------------------------------------------------------------------
     // Токен: получение и автообновление
     // ------------------------------------------------------------------
@@ -279,7 +304,10 @@ public class GigaChatProvider implements AIService {
     // ------------------------------------------------------------------
 
     private String chat(Token access, String text, DocumentType documentType, int retriesLeft) {
-        Map<String, Object> request = buildRequest(text, documentType);
+        return chatBody(access, buildRequest(text, documentType), retriesLeft);
+    }
+
+    private String chatBody(Token access, Map<String, Object> request, int retriesLeft) {
         try {
             Map<String, Object> response = client.post()
                     .uri(URI.create(chatCompletionsUrl()))
@@ -296,7 +324,7 @@ public class GigaChatProvider implements AIService {
                 invalidateToken();
                 try {
                     Token fresh = getValidToken();
-                    return chat(fresh, text, documentType, retriesLeft - 1);
+                    return chatBody(fresh, request, retriesLeft - 1);
                 } catch (AIException retryFailure) {
                     throw retryFailure;
                 } catch (Exception retryFailure) {
@@ -350,7 +378,12 @@ public class GigaChatProvider implements AIService {
         while (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        // OpenAI-совместимый путь GigaChat: /v1/chat/completions
+        // OpenAI-совместимый путь GigaChat: /v1/chat/completions. База может уже
+        // включать /v1 (старый хост https://gigachat.devices.sberbank.ru/api/v1) —
+        // не дублируем сегмент.
+        if (base.toLowerCase(java.util.Locale.ROOT).endsWith("/v1")) {
+            return base + "/chat/completions";
+        }
         return base + "/v1/chat/completions";
     }
 

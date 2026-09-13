@@ -24,6 +24,8 @@ export default function Step1TextInput({
   const [drafts, setDrafts] = useState<DemoDraftDto[]>([]);
   const [draftsError, setDraftsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<{ text: string; err?: boolean } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +70,50 @@ export default function Step1TextInput({
     onDocumentTypeHint?.(draft.documentType);
   };
 
+  /**
+   * «Реанимация документа»: загружаем готовый DOCX/PDF/TXT, сервер извлекает
+   * текст и определяет тип — дальше обычный конвейер (ИИ правит текст,
+   * оформление идёт по шаблону с печатью и подписью).
+   */
+  const handleFile = async (file: File) => {
+    const ok = /\.(docx|pdf|txt)$/i.test(file.name);
+    if (!ok) {
+      setUploadMsg({ text: "Поддерживаются файлы .docx, .pdf и .txt", err: true });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadMsg({ text: "Размер файла не должен превышать 10 МБ", err: true });
+      return;
+    }
+    setUploading(true);
+    setUploadMsg(null);
+    onModeChange("upload");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`/api/documents/extract`, { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setUploadMsg({ text: json?.error?.message ?? "Не удалось разобрать файл", err: true });
+        return;
+      }
+      onTextChange(String(json.text ?? "").slice(0, MAX_LENGTH));
+      const detected = json.documentType as DocumentTypeId | null;
+      if (detected) onDocumentTypeHint?.(detected);
+      setUploadMsg({
+        text: [
+          `✅ Текст извлечён (${String(json.text ?? "").length} символов)`,
+          detected ? `· тип определён: ${DOCUMENT_TYPES.find((t) => t.id === detected)?.label}` : "",
+          json.warning ? `· ${json.warning}` : "",
+        ].join(" "),
+      });
+    } catch {
+      setUploadMsg({ text: "Сервис разбора файлов недоступен — вставьте текст вручную", err: true });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <section>
       <h2 className="text-lg font-medium text-ink-900">Ввод текста</h2>
@@ -97,7 +143,56 @@ export default function Step1TextInput({
         >
           Вставить из буфера
         </button>
+        <button
+          type="button"
+          onClick={() => onModeChange("upload")}
+          className={[
+            "rounded-md px-4 py-1.5 text-sm transition-colors",
+            inputMode === "upload"
+              ? "bg-accent-50 text-accent-600 font-medium"
+              : "text-ink-600 hover:text-ink-900",
+          ].join(" ")}
+        >
+          📄 Есть готовый документ
+        </button>
       </div>
+
+      {inputMode === "upload" && (
+        <div
+          className="mt-4 rounded-xl border-2 border-dashed border-accent-200 bg-accent-50/40 p-6 text-center"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const f = e.dataTransfer.files?.[0];
+            if (f) handleFile(f);
+          }}
+        >
+          <label className="flex cursor-pointer flex-col items-center gap-2">
+            <span className="text-sm font-medium text-ink-900">
+              {uploading ? "⏳ Разбираем документ…" : "Загрузите готовый документ — DOCX, PDF или TXT"}
+            </span>
+            <span className="text-xs text-ink-500">
+              Извлечём текст, ИИ исправит ошибки и оформление, добавим печать и подпись.
+              Или перетащите файл сюда.
+            </span>
+            <input
+              type="file"
+              accept=".docx,.pdf,.txt"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {uploadMsg && (
+            <p className={["mt-3 text-xs", uploadMsg.err ? "text-danger-500" : "text-success-600"].join(" ")}>
+              {uploadMsg.text}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="relative mt-4">
         <textarea

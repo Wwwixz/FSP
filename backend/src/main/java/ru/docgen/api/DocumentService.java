@@ -32,13 +32,23 @@ public class DocumentService {
     private final AIService aiService;
     private final RequisitesService requisitesService;
     private final DocxGenerationService docxService;
+    private final ru.docgen.docx.PdfExportService pdfExportService;
+    private final ru.docgen.docx.QrCodeService qrCodeService;
+    private final DocumentMailService mailService;
     private final DocumentStore store;
 
     public DocumentService(AIService aiService, RequisitesService requisitesService,
-                           DocxGenerationService docxService, DocumentStore store) {
+                           DocxGenerationService docxService,
+                           ru.docgen.docx.PdfExportService pdfExportService,
+                           ru.docgen.docx.QrCodeService qrCodeService,
+                           DocumentMailService mailService,
+                           DocumentStore store) {
         this.aiService = aiService;
         this.requisitesService = requisitesService;
         this.docxService = docxService;
+        this.pdfExportService = pdfExportService;
+        this.qrCodeService = qrCodeService;
+        this.mailService = mailService;
         this.store = store;
     }
 
@@ -55,6 +65,20 @@ public class DocumentService {
         // AIUnavailableException/AIParseException пробрасываются дальше и
         // переводятся GlobalExceptionHandler в понятный формат ошибки.
         AIResult result = aiService.process(request.text(), type);
+
+        // Предохранитель фактов: если ИИ потерял числа (даты, суммы, номера)
+        // из черновика — включается резервный офлайн-обработчик, сохраняющий
+        // текст полностью (сценарий 4 ТЗ: факты искажать нельзя).
+        List<String> warnings = new ArrayList<>();
+        if (numericTokensLost(request.text(), result.improvedText())) {
+            AIResult fallback = new ru.docgen.ai.MockAIProvider().process(request.text(), type);
+            if (!numericTokensLost(request.text(), fallback.improvedText())) {
+                result = fallback;
+                warnings.add("Основной ИИ пропустил часть фактов из черновика — применён резервный "
+                        + "обработчик, сохранивший текст полностью. Можно доработать текст кнопками ниже.");
+            }
+        }
+
         if (result.improvedText() == null || result.improvedText().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "ИИ вернул пустой текст. Попробуйте ещё раз.");
@@ -65,7 +89,13 @@ public class DocumentService {
         session.setImprovedText(result.improvedText());
         session.setRequisites(new EnumMap<>(result.requisites()));
 
-        return toProcessResponse(session);
+        Dto.ProcessResponse response = toProcessResponse(session);
+        if (!warnings.isEmpty()) {
+            response = new Dto.ProcessResponse(response.documentId(), response.improvedText(),
+                    response.documentType(), response.templateId(), response.requisites(),
+                    response.checks(), response.missing(), warnings);
+        }
+        return response;
     }
 
     // ------------------------------------------------------------------
@@ -114,6 +144,13 @@ public class DocumentService {
                     session.setPhotoImage(request.photoImage());
                 }
             }
+            if (request.stampImage() != null) {
+                if (request.stampImage().isBlank()) {
+                    session.setStampImage(null);
+                } else {
+                    session.setStampImage(request.stampImage());
+                }
+            }
         }
         return toProcessResponse(session);
     }
@@ -144,6 +181,23 @@ public class DocumentService {
                 session.setPhotoImage(request.photoImage());
             }
         }
+        // Принимаем печать из запроса (приоритет) и сохраняем в сессию
+        if (request != null && request.stampImage() != null) {
+            if (request.stampImage().isBlank()) {
+                session.setStampImage(null);
+            } else {
+                session.setStampImage(request.stampImage());
+            }
+        }
+        boolean pdf = request != null && "pdf".equalsIgnoreCase(request.format());
+        // Сохраняем параметры «своего шаблона» для повторного просмотра и экспорта
+        if (request != null && request.templateOptions() != null && !request.templateOptions().isEmpty()) {
+            session.setTemplateOptions(request.templateOptions());
+        }
+        // Фирменный бланк пользователя (.docx в base64) для шаблона «Бланк моей организации»
+        if (request != null && request.uploadedTemplate() != null && !request.uploadedTemplate().isBlank()) {
+            session.setUploadedTemplate(request.uploadedTemplate());
+        }
 
         Map<RequisiteKey, String> prepared = requisitesService.prepareForGeneration(session);
         session.setRequisites(prepared);
@@ -158,24 +212,229 @@ public class DocumentService {
                     + TemplateKind.STANDARD.getTitle() + "».");
         }
 
+        // QR со ссылкой на просмотр: id документа выделяем заранее, чтобы
+        // вшить ссылку прямо в файл. Ссылка строится от адреса сайта,
+        // переданного фронтом (window.location.origin).
+        String newDocumentId = store.newId();
+        String previewUrl = null;
+        String qrDataUrl = null;
+        String origin = request == null ? null : request.origin();
+        if (origin != null && (origin.startsWith("http://") || origin.startsWith("https://"))) {
+            previewUrl = origin.replaceAll("/+$", "") + "/api/documents/" + newDocumentId + "/preview";
+            qrDataUrl = qrCodeService.dataUrl(previewUrl, 300);
+        }
+
         DocxGenerationService.GenerationResult generated =
                 docxService.generate(session.getDocumentType(), template, prepared,
                         session.getImprovedText(), session.getSignatureImage(),
-                        session.getPhotoImage());
+                        session.getPhotoImage(), session.getStampImage(), qrDataUrl,
+                        session.getUploadedTemplate(),
+                        request == null ? null : request.templateOptions());
         warnings.addAll(generated.warnings());
 
+        // PDF — программная конвертация тех же данных и правил оформления
+        byte[] content = generated.content();
+        String fileName = generated.fileName();
+        if (pdf) {
+            try {
+                content = pdfExportService.export(session.getDocumentType(), template, prepared,
+                        session.getImprovedText(), session.getSignatureImage(),
+                        session.getPhotoImage(), session.getStampImage(), qrDataUrl,
+                        request == null ? null : request.templateOptions());
+                fileName = fileName.substring(0, fileName.length() - ".docx".length()) + ".pdf";
+            } catch (Exception e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "PDF_EXPORT_FAILED: Не удалось конвертировать документ в PDF. "
+                                + "Попробуйте скачать в формате Word.");
+            }
+        }
+
         GeneratedDocument document = store.saveGenerated(new GeneratedDocument(
-                store.newId(), session, generated.fileName(), generated.content()));
+                newDocumentId, session, fileName, content));
 
         return new Dto.GenerateResponse(true, document.getId(), document.getFileName(),
-                "/api/documents/" + document.getId() + "/download", warnings);
+                "/api/documents/" + document.getId() + "/download", warnings,
+                previewUrl, qrDataUrl);
+    }
+
+    // ------------------------------------------------------------------
+    // Отправка готового документа по почте
+    // ------------------------------------------------------------------
+    public Dto.EmailResponse email(String documentId, Dto.EmailRequest request) {
+        if (request == null || request.to() == null || !request.to().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$")) {
+            throw badRequest("INVALID_EMAIL", "Укажите корректный адрес получателя, например ivanova@example.ru");
+        }
+        GeneratedDocument document = store.getGenerated(documentId);
+        mailService.sendDocument(request.to(), document.getFileName(), document.getContent());
+        return new Dto.EmailResponse(true, "Документ отправлен на " + request.to());
+    }
+
+    // ------------------------------------------------------------------
+    // Просмотр: DOCX-документ → PDF по тем же данным и правилам шаблона
+    // ------------------------------------------------------------------
+    public byte[] toPdf(ProcessedDocument session, TemplateKind template) {
+        return pdfExportService.export(session.getDocumentType(), template,
+                session.getRequisites(), session.getImprovedText(),
+                session.getSignatureImage(), session.getPhotoImage(),
+                session.getStampImage(), null, session.getTemplateOptions());
+    }
+
+    /** Печатный почтовый конверт по реквизитам документа. */
+    public byte[] toEnvelope(ProcessedDocument session) {
+        return pdfExportService.envelope(session.getRequisites(),
+                session.getRequisites().get(RequisiteKey.ORGANIZATION),
+                session.getRequisites().get(RequisiteKey.AUTHOR));
+    }
+
+    // ------------------------------------------------------------------
+    // Разбор готового файла пользователя (DOCX/PDF/TXT) — «реанимация документа»
+    // ------------------------------------------------------------------
+
+    /**
+     * Извлекает текст из загруженного файла и определяет тип документа.
+     * Дальше текст проходит обычный конвейер: ИИ исправляет ошибки и стиль,
+     * реквизиты дополняются из профиля, документ собирается по шаблону
+     * с печатью и подписью. Дополнительное преимущество по ТЗ (раздел 1.6).
+     */
+    public Dto.ExtractResponse extract(org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw badRequest("EMPTY_FILE", "Файл не передан или пустой");
+        }
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String text;
+        try {
+            if (name.endsWith(".docx")) {
+                text = extractDocx(file);
+            } else if (name.endsWith(".pdf")) {
+                text = extractPdf(file);
+            } else if (name.endsWith(".txt")) {
+                text = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            } else {
+                throw badRequest("UNSUPPORTED_FORMAT",
+                        "Поддерживаются файлы .docx, .pdf и .txt — конвертируйте документ и попробуйте снова");
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw badRequest("EXTRACT_FAILED",
+                    "Не удалось прочитать файл. Если это скан или фото, вставьте текст вручную.");
+        }
+        if (text == null || text.isBlank()) {
+            throw badRequest("NO_TEXT_LAYER",
+                    "В файле не найден текст — похоже, это скан или фотография. Вставьте текст вручную.");
+        }
+        text = text.replace("\u0000", "").replaceAll("\\n{3,}", "\n\n").trim();
+        if (text.length() > 20_000) {
+            text = text.substring(0, 20_000);
+        }
+
+        String detected = detectDocumentType(text);
+        String warning = detected == null
+                ? "Тип документа определить не удалось — выберите его на следующем шаге вручную."
+                : null;
+        return new Dto.ExtractResponse(true, text, detected, warning);
+    }
+
+    private String extractDocx(org.springframework.web.multipart.MultipartFile file) throws Exception {
+        try (var in = file.getInputStream();
+             var document = new org.apache.poi.xwpf.usermodel.XWPFDocument(in);
+             var extractor = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(document)) {
+            return extractor.getText();
+        }
+    }
+
+    private String extractPdf(org.springframework.web.multipart.MultipartFile file) throws Exception {
+        try (var document = org.apache.pdfbox.Loader.loadPDF(file.getBytes())) {
+            var stripper = new org.apache.pdfbox.text.PDFTextStripper();
+            return stripper.getText(document);
+        }
+    }
+
+    /** Определяет тип документа по характерным словам заголовка. */
+    static String detectDocumentType(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.contains("служебная записка") || lower.contains("служебную записку")) {
+            return DocumentType.MEMO.getId();
+        }
+        if (lower.contains("докладная записка") || lower.contains("докладную записку")) {
+            return DocumentType.REPORT.getId();
+        }
+        if (lower.contains("информационная справка") || lower.contains("справка")) {
+            return DocumentType.CERTIFICATE.getId();
+        }
+        if (lower.contains("письмо") || lower.startsWith("уважаемый") || lower.startsWith("уважаемая")) {
+            return DocumentType.LETTER.getId();
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // ИИ-доработка улучшенного текста по инструкции пользователя
+    // ------------------------------------------------------------------
+    public Dto.RefineResponse refine(String documentId, Dto.RefineRequest request) {
+        ProcessedDocument session = store.getSession(documentId);
+        if (request == null || request.instruction() == null || request.instruction().isBlank()) {
+            throw badRequest("EMPTY_INSTRUCTION", "Опишите, что сделать с текстом — например «сделай короче»");
+        }
+        String current = session.getImprovedText();
+        String refined = aiService.refine(current, request.instruction().trim());
+        if (refined == null || refined.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "ИИ вернул пустой текст. Исходный вариант не изменился — попробуйте другую формулировку.");
+        }
+        refined = refined.trim();
+
+        // Предохранитель фактов: если при доработке пропало любое число
+        // (дата, сумма, номер), изменение отклоняется — документ не может
+        // потерять сведения из-за прихоти модели (сценарий 4 ТЗ).
+        if (numericTokensLost(current, refined)) {
+            return new Dto.RefineResponse(true, current,
+                    "ИИ при доработке потерял даты или суммы — изменение отклонено, текст остался прежним. "
+                            + "Попробуйте переформулировать инструкцию.");
+        }
+
+        String warning = refined.equals(current)
+                ? "ИИ не внёс изменений — попробуйте сформулировать инструкцию иначе."
+                : null;
+        session.setImprovedText(refined);
+        return new Dto.RefineResponse(true, refined, warning);
+    }
+
+    /** true, если в новом тексте пропали числа, которые были в исходном. */
+    static boolean numericTokensLost(String before, String after) {
+        java.util.Set<Long> beforeValues = numericValues(before);
+        if (beforeValues.isEmpty()) {
+            return false;
+        }
+        java.util.Set<Long> afterValues = numericValues(after);
+        for (Long value : beforeValues) {
+            if (!afterValues.contains(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.util.Set<Long> numericValues(String text) {
+        java.util.Set<Long> values = new java.util.HashSet<>();
+        if (text == null) {
+            return values;
+        }
+        var matcher = java.util.regex.Pattern.compile("\\d+").matcher(text);
+        while (matcher.find()) {
+            try {
+                values.add(Long.parseLong(matcher.group()));
+            } catch (NumberFormatException ignored) {
+                // слишком длинная последовательность цифр — пропускаем
+            }
+        }
+        return values;
     }
 
     // ------------------------------------------------------------------
     // Валидация без создания сессии (быстрая проверка реквизитов)
     // ------------------------------------------------------------------
-    public Dto.ValidateResponse validate(Dto.ValidateRequest request) {
-        if (request == null || request.text() == null || request.text().isBlank()) {
+    public Dto.ValidateResponse validate(Dto.ValidateRequest request) {        if (request == null || request.text() == null || request.text().isBlank()) {
             throw badRequest("EMPTY_TEXT", "Введите текст черновика — поле не может быть пустым");
         }
         DocumentType type = parseType(request.documentType());
@@ -200,7 +459,8 @@ public class DocumentService {
                 session.getTemplateId(),
                 toRequisitesDto(session.getRequisites()),
                 validation.checks().stream().map(Dto.RequisiteCheckDto::from).toList(),
-                validation.missing().stream().map(k -> k.name().toLowerCase(Locale.ROOT)).toList());
+                validation.missing().stream().map(k -> k.name().toLowerCase(Locale.ROOT)).toList(),
+                List.of());
     }
 
     private Dto.RequisitesDto toRequisitesDto(Map<RequisiteKey, String> requisites) {

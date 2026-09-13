@@ -3,13 +3,19 @@ import {
   TEMPLATES,
   type DocumentTypeId,
   type TemplateId,
+  type TemplateOptions,
 } from "../../types/wizard";
+import { useState } from "react";
 
 interface Step2Props {
   documentType: DocumentTypeId;
   template: TemplateId;
+  templateOptions: TemplateOptions;
+  uploadedTemplate: string | null;
   onDocumentTypeChange: (id: DocumentTypeId) => void;
   onTemplateChange: (id: TemplateId) => void;
+  onTemplateOptionsChange: (options: TemplateOptions) => void;
+  onUploadedTemplateChange: (dataUrl: string | null) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -65,6 +71,8 @@ function TemplatePreview({ variant }: { variant: TemplateId }) {
             className={
               variant === "standard"
                 ? "h-1.5 w-3/4 rounded-full bg-ink-400/40"
+                : variant === "custom"
+                ? "mx-auto h-1.5 w-3/4 rounded-full border-2 border-dashed border-accent-400 bg-transparent"
                 : "h-2 w-2/3 rounded-full bg-accent-500/50"
             }
           />
@@ -79,14 +87,169 @@ function TemplatePreview({ variant }: { variant: TemplateId }) {
   );
 }
 
+const FONT_CHOICES = ["Times New Roman", "Arial", "Calibri"];
+const SIZE_CHOICES = ["12", "13", "14"];
+const SPACING_CHOICES = [
+  { value: "1", label: "одинарный" },
+  { value: "1.15", label: "1,15" },
+  { value: "1.5", label: "1,5" },
+  { value: "2", label: "двойной" },
+];
+const INDENT_CHOICES = [
+  { value: "0", label: "без отступа" },
+  { value: "1", label: "1 см" },
+  { value: "1.25", label: "1,25 см" },
+  { value: "2", label: "2 см" },
+];
+const ALIGN_CHOICES = [
+  { value: "justify", label: "по ширине" },
+  { value: "left", label: "по левому краю" },
+  { value: "center", label: "по центру" },
+];
+const HEADER_ALIGN_CHOICES = [
+  { value: "left", label: "по левому краю" },
+  { value: "center", label: "по центру" },
+  { value: "right", label: "по правому краю" },
+];
+
+function CustomTemplateOptionsPanel({
+  options,
+  onChange,
+}: {
+  options: TemplateOptions;
+  onChange: (options: TemplateOptions) => void;
+}) {
+  const set = (patch: Partial<TemplateOptions>) => onChange({ ...options, ...patch });
+  const selectClass =
+    "mt-1.5 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink-900 outline-none focus:border-accent-500";
+  const labelClass = "text-xs font-medium text-ink-600";
+  return (
+    <div className="mt-4 rounded-xl border border-accent-200 bg-accent-50/50 p-4">
+      <p className="text-xs font-semibold text-accent-700">
+        Настройки вашего шаблона — применяются при генерации файла
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div>
+          <label className={labelClass}>Шрифт</label>
+          <select
+            value={options.font}
+            onChange={(e) => set({ font: e.target.value })}
+            className={selectClass}
+          >
+            {FONT_CHOICES.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Размер, pt</label>
+          <select
+            value={options.fontSize}
+            onChange={(e) => set({ fontSize: e.target.value })}
+            className={selectClass}
+          >
+            {SIZE_CHOICES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Интервал</label>
+          <select
+            value={options.lineSpacing}
+            onChange={(e) => set({ lineSpacing: e.target.value })}
+            className={selectClass}
+          >
+            {SPACING_CHOICES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Абзацный отступ</label>
+          <select
+            value={options.indent}
+            onChange={(e) => set({ indent: e.target.value })}
+            className={selectClass}
+          >
+            {INDENT_CHOICES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Выравнивание текста</label>
+          <select
+            value={options.align}
+            onChange={(e) => set({ align: e.target.value as TemplateOptions["align"] })}
+            className={selectClass}
+          >
+            {ALIGN_CHOICES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Шапка колонтитула</label>
+          <select
+            value={options.headerAlign}
+            onChange={(e) => set({ headerAlign: e.target.value as TemplateOptions["headerAlign"] })}
+            className={selectClass}
+          >
+            {HEADER_ALIGN_CHOICES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2 sm:col-span-3">
+          <label className={labelClass}>Текст верхнего колонтитула</label>
+          <input
+            type="text"
+            value={options.header}
+            onChange={(e) => set({ header: e.target.value })}
+            placeholder="[Название организации]"
+            className={selectClass}
+          />
+        </div>
+        <div className="col-span-2 sm:col-span-3">
+          <label className={labelClass}>Текст нижнего колонтитула</label>
+          <input
+            type="text"
+            value={options.footer}
+            onChange={(e) => set({ footer: e.target.value })}
+            placeholder="[Название документа] — [Дата]"
+            className={selectClass}
+          />
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-ink-500">
+        Подсказка: «[Название организации]», «[Название документа]» и «[Дата]» в колонтитулах
+        заменяются на реальные значения из реквизитов.
+      </p>
+    </div>
+  );
+}
+
 export default function Step2TypeTemplate({
   documentType,
   template,
+  templateOptions,
+  uploadedTemplate,
   onDocumentTypeChange,
   onTemplateChange,
+  onTemplateOptionsChange,
+  onUploadedTemplateChange,
   onBack,
   onNext,
 }: Step2Props) {
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleBlankFile = (file: File) => {
+    setUploadError(null);
+    if (!/\.docx$/i.test(file.name)) {
+      setUploadError("Нужен файл .docx — старый .doc или PDF не подойдёт");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("Размер файла не должен превышать 10 МБ");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      onUploadedTemplateChange(reader.result as string);
+      onTemplateChange("uploaded");
+    };
+    reader.onerror = () => setUploadError("Не удалось прочитать файл");
+    reader.readAsDataURL(file);
+  };
   return (
     <section className="animate-fade-in">
       <div>
@@ -159,6 +322,67 @@ export default function Step2TypeTemplate({
             );
           })}
         </div>
+
+        {template === "custom" && (
+          <CustomTemplateOptionsPanel options={templateOptions} onChange={onTemplateOptionsChange} />
+        )}
+
+        {template === "uploaded" && (
+          <div className="mt-4 rounded-xl border border-accent-200 bg-accent-50/50 p-4">
+            <p className="text-xs font-semibold text-accent-700">
+              Фирменный бланк — документ будет оформлен на его основе
+            </p>
+            <div
+              className="mt-3 rounded-xl border border-dashed border-line bg-surface/60 p-5 text-center"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const f = e.dataTransfer.files?.[0];
+                if (f) handleBlankFile(f);
+              }}
+            >
+              <label className="flex cursor-pointer flex-col items-center gap-1.5">
+                {uploadedTemplate ? (
+                  <span className="text-sm font-medium text-success-600">
+                    ✅ Бланк загружен — нажмите, чтобы заменить
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-sm font-medium text-ink-900">
+                      Загрузите бланк .docx или перетащите сюда
+                    </span>
+                    <span className="text-xs text-ink-500">
+                      Сохранятся колонтитулы, поля и шрифты вашего бланка
+                    </span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept=".docx"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleBlankFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {uploadedTemplate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUploadedTemplateChange(null);
+                    onTemplateChange("standard");
+                  }}
+                  className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+                >
+                  Убрать бланк
+                </button>
+              )}
+              {uploadError && <p className="mt-2 text-xs text-danger-500">⚠ {uploadError}</p>}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 flex items-center justify-between">

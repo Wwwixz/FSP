@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RequisiteCheck } from "../../types/wizard";
 import SignaturePad, { SIGNATURE_STORAGE_KEY } from "./SignaturePad";
+import StampPad from "./StampPad";
+import { diffWords } from "../../lib/diff";
 
 export const PHOTO_STORAGE_KEY = "dochelper:photo-image";
 
@@ -148,9 +150,12 @@ function PhotoUploadPad({ compact = false }: { compact?: boolean }) {
 }
 
 interface Step3Props {
+  rawText: string;
   improvedText: string;
   onImprovedTextChange: (text: string) => void;
   requisites: RequisiteCheck[];
+  documentId?: string;
+  warnings?: string[];
   onBack: () => void;
   onNext: () => void;
 }
@@ -160,16 +165,115 @@ function countWords(text: string): number {
   return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
 }
 
+/**
+ * Панель «Что исправил ИИ»: пословное сравнение черновика и улучшенного
+ * текста. Красное зачёркнутое — убрано из черновика, зелёное — добавлено
+ * при обработке. Наглядно показывает эксперту сценарий 2 ТЗ: ошибки
+ * исправлены, смысл и факты не тронуты.
+ */
+function AiChangesPanel({ rawText, improvedText }: { rawText: string; improvedText: string }) {
+  const diff = useMemo(() => diffWords(rawText, improvedText), [rawText, improvedText]);
+  const totalChanges = diff.added + diff.removed;
+  if (totalChanges === 0) {
+    return (
+      <div className="mt-3 rounded-lg bg-success-50 p-3 text-xs text-ink-600">
+        ИИ не нашёл, что исправить — черновик уже был грамотным ✅
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-accent-100 bg-accent-50/40 p-3">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-accent-700 shadow-sm">
+          Исправлений: {totalChanges}
+        </span>
+        <span className="rounded-full bg-success-50 px-2.5 py-1 text-success-700">
+          + добавлено {diff.added}
+        </span>
+        <span className="rounded-full bg-danger-50 px-2.5 py-1 text-danger-600">
+          − убрано {diff.removed}
+        </span>
+      </div>
+      <p className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-900">
+        {diff.tokens.map((token, idx) => {
+          if (token.type === "same") return <span key={idx}>{token.text}</span>;
+          if (token.type === "add") {
+            return (
+              <span key={idx} className="rounded bg-success-100 px-0.5 text-success-700">
+                {token.text}
+              </span>
+            );
+          }
+          return (
+            <span
+              key={idx}
+              className="rounded bg-danger-50 px-0.5 text-danger-500 line-through decoration-danger-400"
+              title="Убрано ИИ при обработке"
+            >
+              {token.text}
+            </span>
+          );
+        })}
+      </p>
+    </div>
+  );
+}
+
 export default function Step3Review({
+  rawText,
   improvedText,
   onImprovedTextChange,
   requisites,
+  documentId,
+  warnings = [],
   onBack,
   onNext,
 }: Step3Props) {
   const [isEditing, setIsEditing] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [refining, setRefining] = useState<string | null>(null);
+  const [refineMsg, setRefineMsg] = useState<{ text: string; err?: boolean } | null>(null);
+  const [customInstruction, setCustomInstruction] = useState("");
   const wordCount = useMemo(() => countWords(improvedText), [improvedText]);
   const missingRequisites = requisites.filter((r) => r.status === "missing");
+
+  /**
+   * Доработка текста командой ИИ: сервер применяет инструкцию к улучшенному
+   * тексту и возвращает новый вариант. Факты сохраняются, ничего не выдумывается.
+   */
+  const sendRefine = async (instruction: string) => {
+    if (!documentId || !instruction.trim() || refining) return;
+    setRefining(instruction);
+    setRefineMsg(null);
+    try {
+      const res = await fetch(`/api/documents/${documentId}/refine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ instruction: instruction.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) {
+        setRefineMsg({ text: json?.error?.message ?? "ИИ-доработка недоступна — текст не изменён", err: true });
+        return;
+      }
+      onImprovedTextChange(String(json.improvedText ?? improvedText));
+      setRefineMsg({
+        text: json.warning ?? `Готово — ИИ применил: «${instruction.trim()}»`,
+        err: Boolean(json.warning),
+      });
+    } catch {
+      setRefineMsg({ text: "Сервис ИИ недоступен — текст не изменён", err: true });
+    } finally {
+      setRefining(null);
+    }
+  };
+
+  const REFINE_CHIPS = [
+    { label: "Короче", instruction: "Сделай текст короче, убери повторы, сохрани все факты и реквизиты" },
+    { label: "Официальнее", instruction: "Сделай формулировки более официальными и канцелярски точными" },
+    { label: "Вежливее", instruction: "Сделай тон более вежливым и уважительным, не меняя сути" },
+    { label: "Подробнее", instruction: "Добавь уместные пояснения к просьбам, не придумывая новых фактов" },
+  ];
 
   return (
     <section className="animate-fade-in">
@@ -189,33 +293,64 @@ export default function Step3Review({
         </p>
       </div>
 
+      {warnings.length > 0 && (
+        <div className="mt-3 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm text-ink-900">
+          {warnings.map((w, i) => (
+            <p key={i} className="flex items-start gap-2">
+              <span aria-hidden="true">⚠</span>
+              <span>{w}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
         {/* Text editor */}
         <div className="rounded-xl border border-line bg-white p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-ink-900">Улучшенный текст</p>
-            <button
-              type="button"
-              onClick={() => setIsEditing((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50"
-            >
-              {isEditing ? (
-                <>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6.2L4.8 9L10 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Готово
-                </>
-              ) : (
-                <>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M8 2L10.5 4.5L4.5 10.5H2V8L8 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                  </svg>
-                  Редактировать
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowDiff((v) => !v)}
+                className={[
+                  "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  showDiff ? "bg-accent-100 text-accent-700" : "text-accent-600 hover:bg-accent-50",
+                ].join(" ")}
+                title="Пословное сравнение с исходным черновиком"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M6 1.5V10.5M6 1.5L3.5 4M6 1.5L8.5 4M6 10.5L3.5 8M6 10.5L8.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Что исправил ИИ
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-accent-600 transition-colors hover:bg-accent-50"
+              >
+                {isEditing ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6.2L4.8 9L10 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Готово
+                  </>
+                ) : (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M8 2L10.5 4.5L4.5 10.5H2V8L8 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                    </svg>
+                    Редактировать
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+
+          {showDiff && rawText.trim() && (
+            <AiChangesPanel rawText={rawText} improvedText={improvedText} />
+          )}
 
           {isEditing ? (
             <textarea
@@ -239,6 +374,60 @@ export default function Step3Review({
             </span>
             <span>{improvedText.length.toLocaleString()} символов</span>
           </div>
+
+          {documentId && (
+            <div className="mt-4 rounded-xl border border-accent-100 bg-accent-50/40 p-3">
+              <p className="text-xs font-semibold text-accent-700">
+                ✨ Доработать с ИИ — он изменит только текст, факты останутся
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {REFINE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => sendRefine(chip.instruction)}
+                    disabled={Boolean(refining)}
+                    className={[
+                      "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                      refining === chip.instruction
+                        ? "bg-accent-600 text-white"
+                        : "bg-white text-ink-900 border border-line hover:border-accent-300 hover:bg-accent-50",
+                    ].join(" ")}
+                  >
+                    {refining === chip.instruction ? "⏳ …" : chip.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={customInstruction}
+                  onChange={(e) => {
+                    setCustomInstruction(e.target.value);
+                    setRefineMsg(null);
+                  }}
+                  placeholder="Своё указание, например: «добавь срок ответа — 5 рабочих дней»"
+                  className="min-w-56 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-xs outline-none focus:border-accent-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => sendRefine(customInstruction)}
+                  disabled={Boolean(refining) || !customInstruction.trim()}
+                  className={[
+                    "rounded-lg px-3.5 py-2 text-xs font-medium text-white transition-colors",
+                    refining || !customInstruction.trim() ? "bg-ink-300 cursor-not-allowed" : "bg-accent-600 hover:bg-accent-500",
+                  ].join(" ")}
+                >
+                  {refining && !REFINE_CHIPS.some((c) => c.instruction === refining) ? "⏳ Применяем…" : "Применить"}
+                </button>
+              </div>
+              {refineMsg && (
+                <p className={["mt-2 text-xs", refineMsg.err ? "text-danger-500" : "text-success-600"].join(" ")}>
+                  {refineMsg.text}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Requisites check */}
@@ -283,6 +472,7 @@ export default function Step3Review({
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <SignaturePad compact />
         <PhotoUploadPad compact />
+        <StampPad compact />
       </div>
 
       <div className="mt-6 flex items-center justify-between">

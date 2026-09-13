@@ -122,26 +122,43 @@ public abstract class AbstractLayoutBuilder {
     }
 
     /**
-     * Вставляет изображение в абзац.
-     * ВАЖНО: используем только один вызов XWPFRun.addPicture — он сам регистрирует
-     * данные картинки и создаёт правильный relation с run. Предварительный вызов
-     * document.addPictureData приводит к «осиротевшим» данным и отсутствию
-     * картинки в просмотрщиках (например, в Word).
+     * Вставляет изображение в абзац с сохранением пропорций исходной картинки:
+     * ширина берётся из {@code targetWidthPx}, высота пересчитывается по
+     * соотношению сторон (но не больше {@code maxHeightPx}). Так загруженная
+     * печать или подпись не искажаются и не выглядят непропорционально мелкими.
      */
     private boolean appendImage(XWPFParagraph paragraph, Object[] parsed,
-                                String fileNameBase, int widthPx, int heightPx) {
+                                String fileNameBase, int targetWidthPx, int maxHeightPx) {
         if (parsed == null) {
             return false;
         }
         int format = (int) parsed[0];
         byte[] bytes = (byte[]) parsed[1];
         String mime = (String) parsed[2];
+        int widthEmu = targetWidthPx * Units.EMU_PER_PIXEL;
+        int heightEmu = maxHeightPx * Units.EMU_PER_PIXEL;
+        // Реальные размеры картинки → пропорциональная высота
+        try (InputStream probe = new ByteArrayInputStream(bytes)) {
+            java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(probe);
+            if (image != null && image.getWidth() > 0) {
+                double scale = (double) targetWidthPx / image.getWidth();
+                int scaledHeight = (int) Math.round(image.getHeight() * scale);
+                if (scaledHeight > maxHeightPx) {
+                    scale = (double) maxHeightPx / image.getHeight();
+                    widthEmu = (int) Math.round(image.getWidth() * scale) * Units.EMU_PER_PIXEL;
+                    heightEmu = maxHeightPx * Units.EMU_PER_PIXEL;
+                } else {
+                    heightEmu = scaledHeight * Units.EMU_PER_PIXEL;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Не удалось определить размер изображения {} — используем базовые пропорции: {}",
+                    fileNameBase, e.getMessage());
+        }
         try (InputStream is = new ByteArrayInputStream(bytes)) {
             XWPFRun run = paragraph.createRun();
             String fileName = fileNameBase + "."
                     + (mime.equals("jpeg") || mime.equals("jpg") ? "jpg" : "png");
-            int widthEmu = widthPx * Units.EMU_PER_PIXEL;
-            int heightEmu = heightPx * Units.EMU_PER_PIXEL;
             run.addPicture(is, format, fileName, widthEmu, heightEmu);
             log.debug("Изображение вставлено: name={}, mime={}, size={} байт",
                     fileName, mime, bytes.length);
@@ -154,18 +171,39 @@ public abstract class AbstractLayoutBuilder {
     }
 
     private Object[] parseSignatureImage() {
-        return parseDataUrlImage(values.signatureImageDataUrl(), "Подпись");
+        Object[] parsed = parseDataUrlImage(values.signatureImageDataUrl(), "Подпись");
+        if (parsed != null) {
+            // Обрезаем прозрачные/белые поля, чтобы росчерк не «отрывался» от печати
+            byte[] trimmed = ImageUtils.trim((byte[]) parsed[1]);
+            parsed[1] = trimmed;
+            parsed[0] = org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG;
+            parsed[2] = "png";
+        }
+        return parsed;
     }
 
     private Object[] parsePhotoImage() {
         return parseDataUrlImage(values.photoImageDataUrl(), "Фото");
     }
 
+    private Object[] parseStampImage() {
+        Object[] parsed = parseDataUrlImage(values.stampImageDataUrl(), "Печать");
+        if (parsed != null) {
+            // Обрезаем белые/прозрачные поля, чтобы печать стояла вплотную к подписи
+            byte[] trimmed = ImageUtils.trim((byte[]) parsed[1]);
+            parsed[1] = trimmed;
+            parsed[0] = org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG;
+            parsed[2] = "png";
+        }
+        return parsed;
+    }
+
     /**
-     * Вставляет изображение подписи в абзац.
+     * Вставляет изображение подписи в абзац: ширина ~5,5 см, пропорции
+     * исходной картинки сохраняются.
      */
     private boolean appendSignatureImage(XWPFParagraph paragraph) {
-        return appendImage(paragraph, parseSignatureImage(), "signature", 170, 70);
+        return appendImage(paragraph, parseSignatureImage(), "signature", 207, 105);
     }
 
     /**
@@ -175,16 +213,57 @@ public abstract class AbstractLayoutBuilder {
         return appendImage(paragraph, parsePhotoImage(), "photo", 90, 120);
     }
 
-    /** Блок подписи: должность / (организация) / [картинка подписи] / И.О. Фамилия. */
+    /**
+     * Дописывает в существующий абзац (рядом с подписью) картинку печати:
+     * около 4,2 см с сохранением пропорций. Два run в одном абзаце —
+     * подпись и печать встают рядом.
+     */
+    protected void appendStampImage(XWPFParagraph paragraph) {
+        appendImage(paragraph, parseStampImage(), "stamp", 160, 160);
+    }
+
+    private Object[] parseQrImage() {
+        return parseDataUrlImage(values.qrImageDataUrl(), "QR-код");
+    }
+
+    /**
+     * Блок «Проверка подлинности» в конце документа: QR-код со ссылкой на
+     * просмотр документа + подпись-пояснение. Вызывается генератором после
+     * построения содержательной части.
+     */
+    public void appendQrBlock() {
+        if (values.qrImageDataUrl() == null || values.qrImageDataUrl().isBlank()) {
+            return;
+        }
+        XWPFParagraph imageParagraph = document.createParagraph();
+        boolean inserted = appendImage(imageParagraph, parseQrImage(), "qr", 100, 100);
+        if (!inserted) {
+            int pos = document.getPosOfParagraph(imageParagraph);
+            if (pos >= 0) {
+                document.removeBodyElement(pos);
+            }
+            return;
+        }
+        paragraph(null, "Проверка подлинности: наведите камеру телефона на QR-код —");
+        paragraph(null, "документ откроется в браузере без установки программ.");
+    }
+
+    /**
+     * Блок подписи: должность / (организация) / [картинка подписи + печать] / И.О. Фамилия.
+     * Блок выровнен по правому краю — как в предпросмотре на сайте.
+     */
     protected void signatureBlock(String styleId, boolean withOrg, String prefixLine) {
         if (prefixLine != null) {
-            paragraph(styleId, prefixLine);
+            XWPFParagraph prefix = paragraph(styleId, prefixLine);
+            prefix.setAlignment(org.apache.poi.xwpf.usermodel.ParagraphAlignment.RIGHT);
         }
-        paragraph(styleId, values.positionLine());
+        XWPFParagraph position = paragraph(styleId, values.positionLine());
+        position.setAlignment(org.apache.poi.xwpf.usermodel.ParagraphAlignment.RIGHT);
         if (withOrg) {
-            String org = values.organizationOrNull();
-            if (org != null) {
-                paragraph(styleId, org);
+            String orgLine = values.organizationOrNull();
+            if (orgLine != null) {
+                XWPFParagraph orgParagraph = paragraph(styleId, orgLine);
+                orgParagraph.setAlignment(org.apache.poi.xwpf.usermodel.ParagraphAlignment.RIGHT);
             }
         }
         // Создаём абзац для картинки ТОЛЬКО если подпись есть и вставилась
@@ -192,13 +271,20 @@ public abstract class AbstractLayoutBuilder {
         if (styleId != null) {
             sigImgParagraph.setStyle(styleId);
         }
+        sigImgParagraph.setAlignment(org.apache.poi.xwpf.usermodel.ParagraphAlignment.RIGHT);
         boolean hadImage = appendSignatureImage(sigImgParagraph);
+        // Печать дописываем рядом с подписью; без подписи — отдельным абзацем
+        if (values.stampImageDataUrl() != null && !values.stampImageDataUrl().isBlank()) {
+            appendStampImage(sigImgParagraph);
+            hadImage = true;
+        }
         if (!hadImage) {
             int pos = document.getPosOfParagraph(sigImgParagraph);
             if (pos >= 0) {
                 document.removeBodyElement(pos);
             }
         }
-        paragraph(styleId, values.signatureNameLine());
+        XWPFParagraph name = paragraph(styleId, values.signatureNameLine());
+        name.setAlignment(org.apache.poi.xwpf.usermodel.ParagraphAlignment.RIGHT);
     }
 }
