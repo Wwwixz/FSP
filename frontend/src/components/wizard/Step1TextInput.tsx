@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DemoDraftDto, DocumentTypeId, InputMode } from "../../types/wizard";
 import { DOCUMENT_TYPES } from "../../types/wizard";
 
@@ -27,24 +27,32 @@ export default function Step1TextInput({
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<{ text: string; err?: boolean } | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/demo-drafts`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as DemoDraftDto[];
-        if (!cancelled) setDrafts(json);
-      } catch (e) {
-        if (!cancelled) setDraftsError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  // Загрузка примеров с таймаутом: на медленном/помершем туннеле не висим вечно
+  const loadDrafts = useCallback(async () => {
+    setLoading(true);
+    setDraftsError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(`/api/demo-drafts`, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as DemoDraftDto[];
+      setDrafts(json);
+    } catch (e) {
+      setDraftsError(
+        e instanceof DOMException && e.name === "AbortError"
+          ? "Сервер не отвечает дольше 15 секунд"
+          : String(e),
+      );
+    } finally {
+      clearTimeout(timer);
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadDrafts();
+  }, [loadDrafts]);
 
   const grouped = useMemo(() => {
     const map = new Map<DocumentTypeId, DemoDraftDto[]>();
@@ -236,9 +244,16 @@ export default function Step1TextInput({
           <p className="mt-3 text-xs text-ink-400">Загрузка примеров…</p>
         )}
         {!loading && draftsError && (
-          <p className="mt-3 text-xs text-danger-500">
-            Не удалось загрузить примеры: {draftsError}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="text-xs text-danger-500">Не удалось загрузить примеры: {draftsError}</p>
+            <button
+              type="button"
+              onClick={loadDrafts}
+              className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:bg-surface"
+            >
+              ↻ Повторить
+            </button>
+          </div>
         )}
         {!loading && !draftsError && drafts.length === 0 && (
           <p className="mt-3 text-xs text-ink-400">Примеры отсутствуют.</p>
