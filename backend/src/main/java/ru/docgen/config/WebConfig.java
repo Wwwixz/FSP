@@ -47,8 +47,19 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(@NonNull String resourcePath, @NonNull Resource location) throws IOException {
-                        // страницы Astro — пути без расширения: отдаём index.html
-                        if (resourcePath.isBlank() || !resourcePath.contains(".")) {
+                        // Astro (static) собирает страницу как <путь>/index.html
+                        if (resourcePath.isBlank()) {
+                            return location.createRelative("index.html");
+                        }
+                        if (!resourcePath.contains(".")) {
+                            Resource page = location.createRelative(resourcePath + "/index.html");
+                            if (page.exists() && page.isReadable()) {
+                                return page;
+                            }
+                            Resource single = location.createRelative(resourcePath + ".html");
+                            if (single.exists() && single.isReadable()) {
+                                return single;
+                            }
                             return location.createRelative("index.html");
                         }
                         Resource requested = location.createRelative(resourcePath);
