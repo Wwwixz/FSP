@@ -6,6 +6,8 @@
 
 **🌐 Публичная версия (деплой):** https://celebrated-heart-production-fac4.up.railway.app/
 
+**🎥 Видео защиты:** https://disk.yandex.ru/i/MhOOBHxVqIvcIw
+
 ---
 
 ## Быстрый старт (локально)
