@@ -4,7 +4,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.resource.PathResourceResolver;
 
 /**
  * CORS для локальной разработки (frontend на Astro dev-сервере).
@@ -29,12 +31,26 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * SPA-fallback: в docker/облачной сборке фронтенд лежит в static/ этого же jar,
-     * и любой путь без точки (/, /settings, /documents…) отдаёт index.html.
-     * Точные маппинги контроллеров (/api/**) всегда имеют приоритет.
+     * SPA-fallback для облачной сборки: фронтенд лежит в static/ этого же jar.
+     * Настоящие файлы (ассеты с точкой) отдаются как есть; пути без точки
+     * (/, /settings, /documents…) получают index.html. Маппинги контроллеров
+     * (/api/**) всегда имеют приоритет над ресурсами.
      */
     @Override
-    public void addViewControllers(@NonNull org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry) {
-        registry.addViewController("/{path:[^\\.]*}").setViewName("forward:/index.html");
+    public void addResourceHandlers(@NonNull ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/**")
+                .addResourceLocations("classpath:/static/")
+                .resourceChain(true)
+                .addResolver(new PathResourceResolver() {
+                    @Override
+                    protected Resource getResource(@NonNull String resourcePath, @NonNull Resource location) throws IOException {
+                        // страницы Astro — пути без расширения: отдаём index.html
+                        if (resourcePath.isBlank() || !resourcePath.contains(".")) {
+                            return location.createRelative("index.html");
+                        }
+                        Resource requested = location.createRelative(resourcePath);
+                        return requested.exists() && requested.isReadable() ? requested : null;
+                    }
+                });
     }
 }
