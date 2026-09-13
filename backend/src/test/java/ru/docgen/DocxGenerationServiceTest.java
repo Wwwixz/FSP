@@ -51,7 +51,7 @@ class DocxGenerationServiceTest {
     @Test
     void standardTemplateContainsRequisitesAndBody() throws Exception {
         var result = service.generate(DocumentType.MEMO, TemplateKind.STANDARD,
-                fullRequisites(), "Прошу выделить средства на закупку техники.", null, null);
+                fullRequisites(), "Прошу выделить средства на закупку техники.", null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             String text = allText(doc);
             assertTrue(text.contains("СЛУЖЕБНАЯ ЗАПИСКА"));
@@ -71,7 +71,7 @@ class DocxGenerationServiceTest {
     @Test
     void modernTemplateHasHeaderTableAndFooter() throws Exception {
         var result = service.generate(DocumentType.MEMO, TemplateKind.MODERN,
-                fullRequisites(), "Прошу выделить средства.", null, null);
+                fullRequisites(), "Прошу выделить средства.", null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             assertEquals(1, doc.getTables().size(), "Табличная шапка «Кому / От кого»");
             String tableText = doc.getTables().get(0).getText();
@@ -92,7 +92,7 @@ class DocxGenerationServiceTest {
     @Test
     void standardTemplateHasOrganizationHeader() throws Exception {
         var result = service.generate(DocumentType.MEMO, TemplateKind.STANDARD,
-                fullRequisites(), "Текст.", null, null);
+                fullRequisites(), "Текст.", null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             String headerText = doc.getHeaderList().stream()
                     .flatMap(h -> h.getParagraphs().stream())
@@ -107,7 +107,7 @@ class DocxGenerationServiceTest {
     void missingRequisitesBecomeExplicitPlaceholders() throws Exception {
         var result = service.generate(DocumentType.MEMO, TemplateKind.STANDARD,
                 Map.of(RequisiteKey.DATE, "12.03.2025", RequisiteKey.SUBJECT, "Тема"),
-                "Текст без реквизитов.", null, null);
+                "Текст без реквизитов.", null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             String text = allText(doc);
             assertTrue(text.contains("[Адресат]"), "Отсутствующий адресат явно помечен");
@@ -120,7 +120,7 @@ class DocxGenerationServiceTest {
     void cyrillicSurvivesRoundTrip() throws Exception {
         String body = "Проверка кириллицы: съезд, ёлка, объём, 180 000 рублей.";
         var result = service.generate(DocumentType.MEMO, TemplateKind.STANDARD,
-                fullRequisites(), body, null, null);
+                fullRequisites(), body, null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             String text = allText(doc);
             assertTrue(text.contains("съезд"));
@@ -134,7 +134,7 @@ class DocxGenerationServiceTest {
     void allTypesGenerateInBothTemplates() throws Exception {
         for (DocumentType type : DocumentType.values()) {
             for (TemplateKind template : TemplateKind.values()) {
-                var result = service.generate(type, template, fullRequisites(), "Текст документа.", null, null);
+                var result = service.generate(type, template, fullRequisites(), "Текст документа.", null, null, null, null, null, null);
                 assertNotNull(result.content());
                 assertTrue(result.content().length > 5000, "docx не пустой");
                 try (XWPFDocument doc = open(result.content())) {
@@ -149,7 +149,7 @@ class DocxGenerationServiceTest {
     @Test
     void letterHasNoTitleLineButHasSubject() throws Exception {
         var result = service.generate(DocumentType.LETTER, TemplateKind.STANDARD,
-                fullRequisites(), "Текст письма.", null, null);
+                fullRequisites(), "Текст письма.", null, null, null, null, null, null);
         try (XWPFDocument doc = open(result.content())) {
             String text = allText(doc);
             assertFalse(text.contains("ПИСЬМО"), "У письма нет строки названия типа");
@@ -160,7 +160,7 @@ class DocxGenerationServiceTest {
     @Test
     void fileIsEditableDocxNotImage() throws Exception {
         var result = service.generate(DocumentType.MEMO, TemplateKind.STANDARD,
-                fullRequisites(), "Редактируемый текст.", null, null);
+                fullRequisites(), "Редактируемый текст.", null, null, null, null, null, null);
         // ZIP-магия DOCX
         assertEquals('P', (char) (result.content()[0] & 0xFF));
         assertEquals('K', (char) (result.content()[1] & 0xFF));
