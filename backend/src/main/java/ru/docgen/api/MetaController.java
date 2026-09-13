@@ -4,6 +4,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -73,9 +74,47 @@ public class MetaController {
                 .toList();
     }
 
+    /**
+     * Лёгкий список демо-черновиков: без полных текстов (только анонсы).
+     * Полный текст — /api/demo-drafts/{id}. Экономит трафик на публичном туннеле.
+     */
     @GetMapping("/demo-drafts")
     public List<Dto.DemoDraftDto> demoDrafts() {
         List<Dto.DemoDraftDto> drafts = new ArrayList<>();
+        for (DemoResource resource : findDemoResources()) {
+            String shortPreview = resource.text.replace("\r\n", " ").replace('\n', ' ')
+                    .replaceAll("\\s{2,}", " ").trim();
+            if (shortPreview.length() > 140) {
+                shortPreview = shortPreview.substring(0, 140) + "…";
+            }
+            String fileName = resource.fileName.replace(".txt", "");
+            drafts.add(new Dto.DemoDraftDto(
+                    resource.typeId + "-" + fileName,
+                    resource.typeId,
+                    resource.typeLabel + " — пример " + fileName,
+                    null,
+                    shortPreview));
+        }
+        drafts.sort(Comparator.comparing(Dto.DemoDraftDto::id));
+        return drafts;
+    }
+
+    /** Полный текст одного демо-черновика по id вида «memo-1». */
+    @GetMapping("/demo-drafts/{id}")
+    public Dto.DemoDraftDto demoDraft(@PathVariable String id) {
+        return findDemoResources().stream()
+                .filter(r -> (r.typeId + "-" + r.fileName.replace(".txt", "")).equals(id))
+                .findFirst()
+                .map(r -> new Dto.DemoDraftDto(id, r.typeId, r.typeLabel + " — пример "
+                        + r.fileName.replace(".txt", ""), r.text, null))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Демо-черновик не найден: " + id));
+    }
+
+    private record DemoResource(String typeId, String typeLabel, String fileName, String text) {
+    }
+
+    private List<DemoResource> findDemoResources() {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         Resource[] resources;
         try {
@@ -84,24 +123,20 @@ public class MetaController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Не удалось загрузить демонстрационные черновики");
         }
+        List<DemoResource> result = new ArrayList<>();
         for (Resource resource : resources) {
             try {
                 String path = resource.getURL().getPath();
-                String typeDir = path.substring(path.lastIndexOf("demo/") + 5, path.lastIndexOf('/'));
+                String typeId = path.substring(path.lastIndexOf("demo/") + 5, path.lastIndexOf('/'));
                 String fileName = path.substring(path.lastIndexOf('/') + 1);
                 String text = FileCopyUtils.copyToString(
                         new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8));
-                DocumentType type = DocumentType.fromId(typeDir);
-                drafts.add(new Dto.DemoDraftDto(
-                        type.getId() + "-" + fileName.replace(".txt", ""),
-                        type.getId(),
-                        type.getLabel() + " — пример " + fileName.replace(".txt", ""),
-                        text));
+                DocumentType type = DocumentType.fromId(typeId);
+                result.add(new DemoResource(typeId, type.getLabel(), fileName, text));
             } catch (Exception e) {
                 // Повреждённый демо-файл не ломает список остальных
             }
         }
-        drafts.sort(Comparator.comparing(Dto.DemoDraftDto::id));
-        return drafts;
+        return result;
     }
 }

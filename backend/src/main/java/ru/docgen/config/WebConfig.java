@@ -27,4 +27,14 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders("*");
     }
+
+    /**
+     * SPA-fallback: в docker/облачной сборке фронтенд лежит в static/ этого же jar,
+     * и любой путь без точки (/, /settings, /documents…) отдаёт index.html.
+     * Точные маппинги контроллеров (/api/**) всегда имеют приоритет.
+     */
+    @Override
+    public void addViewControllers(@NonNull org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry) {
+        registry.addViewController("/{path:[^\\.]*}").setViewName("forward:/index.html");
+    }
 }

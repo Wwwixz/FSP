@@ -125,7 +125,12 @@ public final class Dto {
                                    List<String> missing) {
     }
 
-    public record DemoDraftDto(String id, String documentType, String title, String text) {
+    /**
+     * Демо-черновик. В списке text=null и заполнен preview (короткий анонс);
+     * полный текст отдаётся эндпоинтом /api/demo-drafts/{id} — экономия трафика
+     * для медленных публичных туннелей.
+     */
+    public record DemoDraftDto(String id, String documentType, String title, String text, String preview) {
     }
 
     /**

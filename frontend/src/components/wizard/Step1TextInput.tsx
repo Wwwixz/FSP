@@ -65,9 +65,29 @@ export default function Step1TextInput({
     }
   };
 
-  const handlePickDraft = (draft: DemoDraftDto) => {
-    onTextChange(draft.text.slice(0, MAX_LENGTH));
+  const [pickedDraftId, setPickedDraftId] = useState<string | null>(null);
+
+  /**
+   * Полный текст примера догружается по клику (в списке только анонсы —
+   * экономия трафика на медленных публичных туннелях).
+   */
+  const handlePickDraft = async (draft: DemoDraftDto) => {
     onDocumentTypeHint?.(draft.documentType);
+    if (draft.text != null) {
+      onTextChange(draft.text.slice(0, MAX_LENGTH));
+      setPickedDraftId(draft.id);
+      return;
+    }
+    setPickedDraftId(draft.id);
+    try {
+      const res = await fetch(`/api/demo-drafts/${draft.id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as DemoDraftDto;
+      onTextChange(String(json.text ?? "").slice(0, MAX_LENGTH));
+    } catch {
+      setDraftsError("Не удалось загрузить текст примера — попробуйте ещё раз");
+      setPickedDraftId(null);
+    }
   };
 
   /**
@@ -236,7 +256,7 @@ export default function Step1TextInput({
                   </p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {list.map((d) => {
-                      const active = rawText === d.text;
+                      const active = pickedDraftId === d.id;
                       return (
                         <button
                           key={d.id}
@@ -248,13 +268,14 @@ export default function Step1TextInput({
                               ? "border-accent-500 bg-accent-50 text-accent-700"
                               : "border-line bg-white text-ink-700 hover:border-accent-300 hover:bg-accent-50/40",
                           ].join(" ")}
-                          title={d.text}
+                          title={d.preview ?? undefined}
                         >
                           <p className="line-clamp-2 font-medium leading-snug">
                             {d.title}
                           </p>
                           <p className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">
-                            {d.text.replace(/\s+/g, " ").trim()}
+                            {(d.preview ?? "").replace(/\s+/g, " ").trim()}
+                            {active && <span className="text-accent-600"> ⏳</span>}
                           </p>
                         </button>
                       );

@@ -146,7 +146,10 @@ export interface DemoDraftDto {
   id: string;
   documentType: DocumentTypeId;
   title: string;
-  text: string;
+  /** Полный текст — приходит только после загрузки конкретного примера. */
+  text?: string | null;
+  /** Короткий анонс для карточки в списке. */
+  preview?: string | null;
 }
 
 export interface GenerateResponse {
