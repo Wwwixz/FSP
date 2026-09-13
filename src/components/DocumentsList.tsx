@@ -36,6 +36,8 @@ export default function DocumentsList() {
   const [docs, setDocs] = useState<DocEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [sed, setSed] = useState<SedIntegration | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sedError, setSedError] = useState<string | null>(null);
 
   useEffect(() => {
     setDocs(loadDocuments());
@@ -49,8 +51,23 @@ export default function DocumentsList() {
   };
 
   const handleSendToSed = (id: string) => {
-    const updated = markDocumentSentToSed(id);
-    setDocs(updated);
+    if (!sed) return;
+    setSendingId(id);
+    setSedError(null);
+    fetch(`/api/documents/${encodeURIComponent(id)}/send-to-sed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sed),
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(payload?.error?.message ?? "Не удалось отправить документ в СЭД");
+        }
+        setDocs(markDocumentSentToSed(id));
+      })
+      .catch((error: Error) => setSedError(error.message))
+      .finally(() => setSendingId(null));
   };
 
   if (!loaded) {
@@ -96,6 +113,11 @@ export default function DocumentsList() {
 
   return (
     <div className="stagger-children space-y-2">
+      {sedError && (
+        <div className="rounded-xl border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-600">
+          {sedError}
+        </div>
+      )}
       {docs.map((doc) => (
         <div
           key={doc.id}
@@ -123,9 +145,10 @@ export default function DocumentsList() {
             <button
               type="button"
               onClick={() => handleSendToSed(doc.id)}
+              disabled={sendingId === doc.id}
               className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-200 hover:bg-accent-50 hover:text-accent-600"
             >
-              Отправить в СЭД
+              {sendingId === doc.id ? "Отправка…" : "Отправить в СЭД"}
             </button>
           ) : null}
           <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">

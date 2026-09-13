@@ -1,7 +1,15 @@
 package ru.docgen.api;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import ru.docgen.ai.AIResult;
 import ru.docgen.ai.AIService;
@@ -21,6 +29,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.net.URI;
 
 /**
  * Оркестрация основного сценария: обработка черновика → заполнение
@@ -33,6 +42,7 @@ public class DocumentService {
     private final RequisitesService requisitesService;
     private final DocxGenerationService docxService;
     private final DocumentStore store;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public DocumentService(AIService aiService, RequisitesService requisitesService,
                            DocxGenerationService docxService, DocumentStore store) {
@@ -40,6 +50,47 @@ public class DocumentService {
         this.requisitesService = requisitesService;
         this.docxService = docxService;
         this.store = store;
+    }
+
+    public Dto.SedSendResponse sendToSed(String documentId, Dto.SedSendRequest request) {
+        if (request == null || request.apiUrl() == null || request.apiUrl().isBlank()
+                || request.apiKey() == null || request.apiKey().isBlank()) {
+            throw badRequest("SED_CONFIG_REQUIRED", "Укажите URL СЭД и ключ доступа");
+        }
+
+        URI target;
+        try {
+            target = URI.create(request.apiUrl().trim());
+        } catch (IllegalArgumentException e) {
+            throw badRequest("SED_INVALID_URL", "Укажите корректный URL СЭД");
+        }
+        if (!"http".equalsIgnoreCase(target.getScheme()) && !"https".equalsIgnoreCase(target.getScheme())) {
+            throw badRequest("SED_INVALID_URL", "URL СЭД должен начинаться с http:// или https://");
+        }
+
+        GeneratedDocument document = store.getGenerated(documentId);
+        ByteArrayResource file = new ByteArrayResource(document.getContent()) {
+            @Override
+            public String getFilename() {
+                return document.getFileName();
+            }
+        };
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", file);
+        body.add("documentId", documentId);
+        body.add("fileName", document.getFileName());
+        body.add("systemName", request.systemName() == null ? "" : request.systemName());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.setBearerAuth(request.apiKey().trim());
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                target, new HttpEntity<>(body, headers), String.class);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new ResponseStatusException(response.getStatusCode(),
+                    "СЭД вернула ошибку HTTP " + response.getStatusCode().value());
+        }
+        return new Dto.SedSendResponse(true, "Документ передан в СЭД");
     }
 
     // ------------------------------------------------------------------

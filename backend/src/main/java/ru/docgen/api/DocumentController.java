@@ -75,6 +75,13 @@ public class DocumentController {
                 .body(document.getContent());
     }
 
+    /** Отправить готовый DOCX в подключённую СЭД. */
+    @PostMapping("/{documentId}/send-to-sed")
+    public Dto.SedSendResponse sendToSed(@PathVariable String documentId,
+                                         @RequestBody Dto.SedSendRequest request) {
+        return service.sendToSed(documentId, request);
+    }
+
     /** Список сформированных документов (для раздела «Мои документы»). */
     @GetMapping
     public List<Dto.GeneratedDocumentDto> list() {
