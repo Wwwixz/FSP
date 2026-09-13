@@ -14,9 +14,10 @@ FROM maven:3.9-eclipse-temurin-21 AS be
 WORKDIR /be
 COPY backend/pom.xml .
 RUN mvn -q -DskipTests dependency:go-offline
-COPY backend/src backend/src
+# источники — в ./src, как ожидает Maven (pom.xml лежит в /be)
+COPY backend/src ./src
 # статика фронта внутрь jar: один origin, без CORS
-COPY --from=fe /fe/dist backend/src/main/resources/static
+COPY --from=fe /fe/dist ./src/main/resources/static
 RUN mvn -q -DskipTests package
 
 # --- 3. Рантайм ---
